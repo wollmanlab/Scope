@@ -1,0 +1,54 @@
+{
+   "VERSION": 3,
+   "ID": "Micro-Manager XY-position list",
+   "POSITIONS": [
+      {
+         "GRID_COL": 0,
+         "DEVICES": [
+            {
+               "DEVICE": "Z",
+               "AXES": 1,
+               "Y": 0,
+               "X": 0,
+               "Z": 0
+            },
+            {
+               "DEVICE": "XY",
+               "AXES": 2,
+               "Y": -0,
+               "X": -0,
+               "Z": 0
+            }
+         ],
+         "PROPERTIES": {},
+         "DEFAULT_Z_STAGE": "Z",
+         "LABEL": "Pos0",
+         "GRID_ROW": 0,
+         "DEFAULT_XY_STAGE": "XY"
+      },
+      {
+         "GRID_COL": 0,
+         "DEVICES": [
+            {
+               "DEVICE": "Z",
+               "AXES": 1,
+               "Y": 0,
+               "X": 0,
+               "Z": 0
+            },
+            {
+               "DEVICE": "XY",
+               "AXES": 2,
+               "Y": -0,
+               "X": -0,
+               "Z": 0
+            }
+         ],
+         "PROPERTIES": {},
+         "DEFAULT_Z_STAGE": "Z",
+         "LABEL": "Pos1",
+         "GRID_ROW": 0,
+         "DEFAULT_XY_STAGE": "XY"
+      }
+   ]
+}
