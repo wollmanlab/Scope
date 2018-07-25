@@ -271,7 +271,11 @@ classdef Scope < handle
                 %% figure out image filename to be used by MM
                 % start write
                 poslabel = Scp.Pos.peek;
-                filename = sprintf('img_%s_%09g_%09g_%s_000.tif',poslabel,Scp.FrameCount(p),t-1,AcqData(i).Channel);
+                if ~Scp.Strobbing
+                    filename = sprintf('img_%s_%09g_%09g_%s_000.tif',poslabel,Scp.FrameCount(p),t-1,AcqData(i).Channel);
+                else %spim specific
+                    filename = sprintf('img_%s_%03g_Ch%d_000.tif',poslabel,Scp.FrameCount(p)-1,i);
+                end
                 if Scp.Pos.N>1 && ~Scp.Strobbing % add position folder
                     filename =  fullfile(sprintf('Pos%g',p-1),filename);
                 end
@@ -293,15 +297,17 @@ classdef Scope < handle
                 %% Snap image / or pull from camera seq
                 % proceed differ whether we are using MM to show the stack
                 if Scp.Strobbing
-                    filename = fullfile(Scp.pth,acqname,filename); 
                     filename = filename(1:end-4); % remote .tiff
+                    filename2ds = fullfile(acqname,filename); 
                     NFrames = Scp.Pos.ExperimentMetadata(Scp.Pos.current).nFrames;
                     dz = Scp.Pos.ExperimentMetadata(Scp.Pos.current).dz;
-                    Scp.ZStage.Velocity = 1;
-                    Scp.ZStage.move(dz*NFrames)
-                    snapSeqDatastore(Scp,filename,NFrames)
-                  %  Scp.ZStage.Velocity = 10;
+                    Scp.ZStage.Velocity = 8;
+                    Scp.ZStage.moveWithDelay(dz*NFrames);
+                    tic;
+                    Scp.snapSeqDatastore(Scp.pth,filename2ds,NFrames)
+                    Scp.ZStage.Velocity = 10;
                     Scp.goto(Scp.Pos.peek,Scp.Pos);
+                    filename = [filename filesep 'MMStack.ome.tif'];
                 else
                     if Scp.Pos.N>1
                         if ~exist([Scp.pth filesep acqname filesep sprintf('Pos%g',p-1)],'dir')
@@ -380,27 +386,30 @@ classdef Scope < handle
         end
         
         %% snapSeq using datastore on the SSD
-        function snapSeqDatastore(Scp,pth,NFrames)
-            store = Scp.studio.data().createMultipageTIFFDatastore(pth,false,false);
+        function snapSeqDatastore(Scp,pth,filename,NFrames)
+            store = Scp.studio.data().createMultipageTIFFDatastore([pth filesep filename],false,false);
             Scp.studio.displays().manage(store);
             %Scp.studio.displays().createDisplay(store);
             builder = Scp.studio.data().getCoordsBuilder().z(0).channel(0).stagePosition(0);
             curFrame = 0;
             Scp.mmc.startSequenceAcquisition(NFrames, 0, false);
+            toc;
             while((Scp.mmc.getRemainingImageCount()>0) || (Scp.mmc.isSequenceRunning(Scp.mmc.getCameraDevice())))
                 if (Scp.mmc.getRemainingImageCount()>0)
                     timg = Scp.mmc.popNextTaggedImage();
                     img = Scp.studio.data().convertTaggedImage(timg, builder.time(curFrame).build(),'');
                     store.putImage(img);
                     curFrame=curFrame+1;
-                    %Scp.mmc.getRemainingImageCount()
-                %else
-                    %Scp.mmc.sleep(min(0.25*Scp.Exposure,1))
+                    clear timg;
+                    Scp.mmc.getRemainingImageCount();
+                else
+                    Scp.mmc.sleep(min(0.25*Scp.Exposure,1));
                 end
             end
             
             Scp.mmc.stopSequenceAcquisition();
             store.close();
+            clear store;
             fprintf('OK\n')
         end
         
@@ -604,7 +613,7 @@ classdef Scope < handle
                 case 'time(site)'
                     func = @() multiSiteAction(Scp,arg.func);
                     if ~isempty(arg.dooncepertimepoint)
-                        func = [{func} arg.dooncepertimepoint];
+                        func = [arg.dooncepertimepoint {func}];
                     end
                     multiTimepointAction(Scp,func);
                 case 'site(time)'
@@ -679,11 +688,11 @@ classdef Scope < handle
         end
         
         function AcqData = optimizeChannelOrder(Scp,AcqData)  %#ok<INUSD>
-             error('Not implemented in Scope - overload to use!')
+             warning('Not implemented in Scope - overload to use!')
         end
         
         function [z,s]=autofocus(Scp,AcqData) %#ok<STOUT,INUSD>
-            error('Not implemented in Scope - overload to use!')
+            warning('Not implemented in Scope - overload to use!')
         end
         
         %% Accesory functions
@@ -1008,6 +1017,36 @@ classdef Scope < handle
             end
             Scp.XY=[Scp.X+dxdy(1)*frmX Scp.Y+dxdy(2)*frmY];
         end
+        
+        
+        function Pos = createPositionFromMMNoSet(Scp,varargin)
+            arg.labels={};
+            arg.groups={};
+            arg.axis={'XY'};
+            arg.message = 'Please click when you finished marking position';
+            arg.experimentdata=struct([]);
+            arg = parseVarargin(varargin,arg);
+            if Scp.MMversion < 1.5
+                Scp.studio.showXYPositionList; %Alon
+            else
+                Scp.studio.showPositionList;
+            end
+            uiwait(msgbox(arg.message))
+            Pos = Positions(Scp.studio.getPositionList,'axis',arg.axis);
+            if ~isempty(arg.labels)
+                Pos.Labels = arg.labels;
+                if isempty(arg.groups)
+                    Pos.Group=arg.labels;
+                end
+            end
+            if ~isempty(arg.groups)
+                Pos.Group=arg.groups;
+            end
+            if ~isempty(arg.experimentdata)
+                Pos.addMetadata(Scp.Pos.Labels,[],[],'experimentdata',arg.experimentdata);
+            end
+        end
+        
         
         function createPositionFromMM(Scp,varargin)
             arg.labels={};
@@ -1334,7 +1373,7 @@ classdef Scope < handle
             TriggeredChannels = cat(1,AcqData.Triggered);
             indx=find(TriggeredChannels);
             if isempty(indx), return, end
-            import mmcorej.StrVector;
+            %import mmcorej.StrVector;
             trgrseq = StrVector();
             
             for i=1:numel(indx)
