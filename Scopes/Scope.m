@@ -1,4 +1,4 @@
-classdef Scope < handle
+classdef (Abstract) Scope < handle
     % Version 0.5 Feb 2018 - split Ninja specific stuff. 
     % Making Scope compatible with MM 2.0
     
@@ -428,8 +428,9 @@ classdef Scope < handle
             for i=1:numel(AcqData)
                 Scp.Channel=AcqData(i).Channel;
                 Scp.Exposure=AcqData(i).Exposure;
-                %                 flt = createFlatFieldImage(Scp,'filter',true,'iter',5,'assign',true);
-                flt = createFlatFieldImage(Scp,'filter',true,'iter',5,'assign',true,'meanormedian','median','xymove',0.1,'open',strel('disk',250),'gauss',fspecial('gauss',150,75));
+                % use createFlatFieldImage with defaults beside increase
+                % iterations
+                flt = createFlatFieldImage(Scp,'filter',true,'iter',15,'assign',true,'meanormedian','median');
                 Scp.snapImage;
                 figure(321)
                 imagesc(flt);
@@ -468,10 +469,12 @@ classdef Scope < handle
         end
         
         function  img = doFlatFieldCorrection(Scp,img,varargin)
-            
+            arg.offset = 100; 
+            arg.percenttozeros = 0.05; 
+            arg = parseVarargin(varargin,arg); 
             flt = getFlatFieldImage(Scp,varargin);
-            img = (img-100/2^16)./flt+100/2^16;
-            img(flt<0.05) = prctile(img(unidrnd(numel(img),10000,1)),1); % to save time, look at random 10K pixels and not all of them...
+            img = (img-arg.offset/2^Scp.BitDepth)./flt+arg.offset/2^Scp.BitDepth;
+            img(flt<arg.percenttozeros) = prctile(img(unidrnd(numel(img),10000,1)),1); % to save time, look at random 10K pixels and not all of them...
             % deal with artifacts
             img(img<0)=0;
             img(img>1)=1;
@@ -798,12 +801,11 @@ classdef Scope < handle
             arg.xymove = 0.1;
             arg.open=strel('disk',50);
             arg.gauss=fspecial('gauss',75,25);
+            arg.cameraoffset = 100; 
             % will try to avoid saturation defined as pixel =0 (MM trick or
             % by the function handle in arg.saturation.
             arg.saturation = @(x) x>20000/2^16; % to disable use: @(x) false(size(x));
             arg = parseVarargin(varargin,arg);
-            
-            Scp.CorrectFlatField = 0;
             
             XY0 = Scp.XY;
             
@@ -840,15 +842,13 @@ classdef Scope < handle
                 flt(~msk)=nan;
                 flt = imfilter(flt,arg.gauss,'symmetric');
             end
-            flt = flt-100/2^16;
+            flt = flt-arg.cameraoffset/2^Scp.BitDepth;
             flt = flt./nanmean(flt(:));
             
             %% assign to FlatField
             if arg.assign
                 Scp.FlatFields.(char(Scp.mmc.getCurrentConfig('FlatField')))=flt;
             end
-            
-            Scp.CorrectFlatField = 1;
             
         end
         

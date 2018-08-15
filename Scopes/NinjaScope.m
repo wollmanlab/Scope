@@ -2,6 +2,7 @@ classdef NinjaScope < Scope
    
     properties
        LaserVoltage = struct('name',{},'minV',[],'maxV',[]);
+       OptovarStatus=[]; 
     end
     
     methods
@@ -292,7 +293,28 @@ classdef NinjaScope < Scope
             end
             
         end
+        
+        function Mag = getOptovar(Scp)
+            % if Optovar is set - return it's value. 
+            if ~isempty(Scp.OptovarStatus)
+                Mag = Scp.OptovarStatus; 
+                return
+            end
+            
+            % if we are here, optovar status is unknown
+            try
+                readout = Scp.mmc.getProperty('Optovar','DigitalInput');
+                readout = str2double(char(readout));
+                if readout == 1
+                    Mag = 1.5;
+                elseif readout == 0
+                    Mag = 1;
+                end
+            catch % if error get user input on Optovar
+                button = questdlg('What is the optovar position?','set optovar','1','1.5','1');  
+                Mag = str2double(button); 
+            end
+            Scp.OptovarStatus=Mag; 
+        end
     end
-    
-    
 end
