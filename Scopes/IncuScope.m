@@ -124,7 +124,146 @@ classdef IncuScope < Scope
                 Scp.resetASI; 
             end
             
-           
+                     
+            function fltname = getFlatFieldName(Scp)
+                fltname=Scp.Channel;
+            end
+            
+            
+            
+            
+            
+            function Zfocus = ImageBasedFocusHillClimb(Scp,varargin)
+                %Works pretty well with BF:
+                %Scp.ImageBasedFocusHillClimb('channel','Brightfield','exposure',20,'resize',0.25,'scale',50)
+                %Works really well with Hoescht:
+                %Scp.ImageBasedFocusHillClimb('channel','Brightfield','exposure',20,'resize',0.25,'scale',50)
+                
+                arg.scale = 2; % if True will acq multiple channels per Z movement.
+                arg.resize =1;
+                arg.channel = 'DeepBlue'; % if True will acq multiple channels per Z movement.
+                arg.exposure =10;
+                % False will acq a Z stack per color.
+                arg = parseVarargin(varargin,arg);
+                %% Set channels and exposure
+                    Scp.Channel=arg.channel;
+                    Scp.Exposure=arg.exposure;
+                
+                
+                figure(157),
+                set(157,'menubar','none','Name','Finding focus by contrast','NumberTitle','off')
+
+                clf
+                
+                Zinit = Scp.Z;
+                dZ = 50;
+                sgn = 1;
+                acc = 50^(1/5);
+                cont1=Scp.Contrast('scale',arg.scale,'resize',arg.resize);  %measure of contrast
+                plot(Scp.Z,cont1,'o')
+                hold all
+                
+                %determine direction of motion
+                
+                Scp.Z = Scp.Z+sgn*dZ;
+                cont2=Scp.Contrast('scale',arg.scale,'resize',arg.resize); 
+                plot(Scp.Z,cont2,'o')
+                
+                if cont2<cont1
+                    sgn = -sgn;
+                    Scp.Z = Scp.Z+2*sgn*dZ;
+                    cont2=Scp.Contrast('scale',arg.scale,'resize',arg.resize);
+                    set(157,'menubar','none','Name','Finding focus by contrast','NumberTitle','off')
+                    plot(Scp.Z,cont2,'o');
+                    if cont2<cont1
+                        dZ=dZ/(acc^2);
+                        Scp.Z = Zinit;%start over with smaller region
+                        cont1=Scp.Contrast('scale',arg.scale,'resize',arg.resize);  %measure of contrast
+                        
+                        Scp.Z = Scp.Z+sgn*dZ;
+                        cont2=Scp.Contrast('scale',arg.scale,'resize',arg.resize);
+                        plot(Scp.Z,cont2,'o')
+                        if cont2<cont1
+                            sgn = -sgn;
+                            Scp.Z = Scp.Z+2*sgn*dZ;
+                            cont2=Scp.Contrast('scale',arg.scale,'resize',arg.resize);
+                            plot(Scp.Z,cont2,'o');
+                        end                
+                        %sgn = -sgn;
+                    end
+                end
+                
+                while dZ>1
+                    while cont2>=cont1
+                        cont1=cont2;
+                        Scp.Z = Scp.Z+sgn*dZ;
+                        cont2=Scp.Contrast('scale',arg.scale,'resize',arg.resize); 
+                        figure(157);
+                        plot(Scp.Z,cont2,'o')
+                    end
+                    dZ = dZ/acc;
+                    sgn=-sgn;
+                    cont1=cont2;
+                end
+                Zfocus = Scp.Z+sgn*dZ*acc;
+                Scp.Z = Zinit;
+            end
+            
+            
+            
+            
+            function cont = Contrast(Scp,varargin)
+                arg.scale = 2; % if True will acq multiple channels per Z movement.
+                arg.resize =1;
+                % False will acq a Z stack per color.
+                arg = parseVarargin(varargin,arg);
+                img=imresize(Scp.snapImage, arg.resize);
+                m=img-imgaussfilt(img,arg.scale);
+                m = m(200:end,200:end);
+                rng=prctile(m(:),[1 99]);
+                cont=rng(2)-rng(1);
+            end
+            
+            function focusAdjust(Scp,varargin)
+                arg.Diff = -30;
+                arg.scale = 2; % if True will acq multiple channels per Z movement.
+                arg.resize =1;
+                arg.channel = 'DeepBlue'; % if True will acq multiple channels per Z movement.
+                arg.exposure =10;
+                arg = parseVarargin(varargin,arg);
+
+               Scp.goto(Scp.Pos.Labels{1}, Scp.Pos)
+               Zfocus = Scp.ImageBasedFocusHillClimb(varargin{:});
+               
+               dZ = Zfocus-Scp.Z+arg.Diff;
+               Scp.Pos.List(:,3) = Scp.Pos.List(:,3)+dZ;
+            end
+                      
+            function dZ = findInitialFocus(Scp,varargin)
+                arg.scale = 2; % if True will acq multiple channels per Z movement.
+                arg.resize =1;
+                arg.channel = 'DeepBlue'; % if True will acq multiple channels per Z movement.
+                arg.exposure =20;
+                
+                arg = parseVarargin(varargin,arg);
+                
+                Scp.goto(Scp.Pos.Labels{1}, Scp.Pos)
+                figure(445)
+                set(445,'Windowstyle','normal','toolbar','none','menubar','none','Position',[700 892 300 75],'Name','Please find focus in first well','NumberTitle','off')
+                uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
+                uiwait(445)
+                Scp.Pos.List(:,3) = Scp.Z;
+                ManualZ = Scp.Z;
+                for i=1:Scp.Pos.N
+                    Scp.goto(Scp.Pos.Labels{i}, Scp.Pos)
+                    Zfocus = Scp.ImageBasedFocusHillClimb(varargin{:});
+                    if i==1
+                        dZ = ManualZ-Zfocus;%difference bw what I call focus and what Mr. computer man thinks.
+                    end
+                    Scp.Pos.List(i,3) = Zfocus+dZ;
+                end
+            end
+% 
             
         end
 end
