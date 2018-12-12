@@ -93,14 +93,14 @@ classdef RazorScope < Scope
         
         function setRefImage(Scp,AcqData)
             Scp.Channel = AcqData(1).Channel;
-            Scp.goto(Scp.Pos.Labels{1}, Scp.Pos); %go to first position       
+            Scp.goto(Scp.Pos.Labels{5}, Scp.Pos); %go to first position       
             Scp.refImage = Scp.snapImage;%snap an image
         end
         
         function ref = DriftAdjust(Scp,AcqData)
             ref = Scp.refImage;
             Scp.Channel = AcqData(1).Channel;
-            Scp.goto(Scp.Pos.Labels{1}, Scp.Pos); %go to first position
+            Scp.goto(Scp.Pos.Labels{5}, Scp.Pos); %go to first position
             
             img = Scp.snapImage;%snap an image
             imXcorr = convnfft(ref-mean(ref(:)),rot90(img,2)-mean(img(:)),'same');%compare image to input ref
@@ -110,7 +110,7 @@ classdef RazorScope < Scope
             dX = maxX-size(img,2)/2
             Scp.Pos.List(:,1) = Scp.Pos.List(:,1)-dX; %update position list
             Scp.Pos.List(:,2) = Scp.Pos.List(:,2)-dY; %update position list
-            Scp.goto(Scp.Pos.Labels{1}, Scp.Pos); %take new ref for next r0und
+            Scp.goto(Scp.Pos.Labels{5}, Scp.Pos); %take new ref for next r0und
             
             img = Scp.snapImage;%snap an image
             imXcorr = convnfft(ref-mean(ref(:)),rot90(img,2)-mean(img(:)),'same');%compare image to input ref
@@ -120,7 +120,7 @@ classdef RazorScope < Scope
             dX = maxX-size(img,2)/2;
             Scp.Pos.List(:,1) = Scp.Pos.List(:,1)-dX; %update position list
             Scp.Pos.List(:,2) = Scp.Pos.List(:,2)-dY; %update position list
-            Scp.goto(Scp.Pos.Labels{1}, Scp.Pos); %take new ref for next r0und
+            Scp.goto(Scp.Pos.Labels{5}, Scp.Pos); %take new ref for next r0und
             
             ref = Scp.snapImage;
         end
@@ -178,7 +178,7 @@ classdef RazorScope < Scope
                     for ix=1:numel(unique(ListSide{i}(:,1)))
                         for jx=1:numel(unique(ListSide{i}(:,2)))
                             Labels{Counter} = sprintf('Theta%03d_X%d_Y%d_tile%02d',90*(i-1),ix,jx,Counter-1);
-                            Groups{Counter} = 'Cornea';
+                            Groups{Counter} = sprintf('Theta_%03d',mod(round(ListSide{i}((ix-1)*numel(unique(ListSide{i}(:,2)))+jx,4)),360));
                             Tiles{Counter} = num2str(Counter-1);
                             Counter = Counter+1;
                         end
@@ -255,7 +255,7 @@ classdef RazorScope < Scope
                     for ix=1:numel(unique(ListSide{i}(:,1)))
                         for jx=1:numel(unique(ListSide{i}(:,2)))
                             Labels{Counter} = sprintf('Theta%03d_X%d_Y%d_tile%02d',mod(round(ListSide{i}((ix-1)*numel(unique(ListSide{i}(:,2)))+jx,4)),360),ix,jx,Counter-1);
-                            Groups{Counter} = 'Stack';
+                            Groups{Counter} = sprintf('Theta_%03d',mod(round(ListSide{i}((ix-1)*numel(unique(ListSide{i}(:,2)))+jx,4)),360));
                             Tiles{Counter} = num2str(Counter-1);
                             Counter = Counter+1;
                         end
@@ -519,6 +519,89 @@ classdef RazorScope < Scope
             uicontrol(417,'Style','popup','String',Scp.getPossibleChannels,'Position',[50 0 150 50],'fontsize',13,'callback',@(source,~) Scp.setChannel(source.String{source.Value}));
         end
         
+        
+        
+        
+        function prepareProcessingFiles(Scp)
+            
+            procDirName = [Scp.MD.pth '/Processing'];
+            if ~isdir(procDirName)
+                mkdir(procDirName);
+            end
+            masterFileName = fullfile(procDirName,'master');
+            fid = fopen(masterFileName, 'wt' );
+            fprintf( fid, '%s\n', 'basedirfrom="/RazorScopeData/RazorScopeImages"');
+            fprintf( fid, '%s\n', 'basedirto="/RazorScopeData/RazorScopeSets"');
+            fprintf( fid, '%s\n\n', 'repodir="/home/wollmanlab/Documents/Repos/bigstitchparallel"');
+            
+            fprintf( fid, '%s\n', 'xmljobs_export="/Processing/xmljobs"');
+            fprintf( fid, '%s\n', 'hdf5jobs_export="/Processing/hdf5jobs"');
+            fprintf( fid, '%s\n', 'shiftjobs_export="/Processing/shiftjobs"');
+            fprintf( fid, '%s\n', 'beadsjobs_export="/Processing/beadsjobs"');
+            fprintf( fid, '%s\n', 'ICPjobs_export="/Processing/ICPjobs"');
+            fprintf( fid, '%s\n', 'Multiviewjobs_export="/Processing/multiviewjobs"');
+            fprintf( fid, '%s\n', 'Stabilizejobs_export="/Processing/stabilizejobs"');
+            fprintf( fid, '%s\n', 'fusejobs_export="/Processing/fusejobs"');
+            fprintf( fid, '%s\n\n', 'fused_dir="/Fused"');
+            
+            pth = Scp.MD.pth;
+            pth = pth(strfind(Scp.MD.pth,Scp.Username)-1:end);
+            pth = strrep(pth,'\','/');
+            fprintf( fid, 'pth="%s"\n\n', pth);
+            
+            nTimePoint = numel(Scp.MD.unique('frame'));
+            nChannels = numel(Scp.MD.unique('Channel'));
+            nTiles = numel(Scp.MD.unique('Tile'));
+            nAngles = numel(Scp.MD.unique('group'));
+            nPos = 1;
+            
+            fprintf( fid, 'timepoints="%d"\n',nTimePoint );
+            fprintf( fid, 'channels="%d"\n', nChannels);
+            fprintf( fid, 'tiles="%d"\n', nTiles);
+            fprintf( fid, 'angles="%d"\n', nAngles);
+            fprintf( fid, 'pos="%d"\n\n', nPos);
+            
+            zAspect = Scp.MD.unique('dz')./Scp.MD.unique('PixelSize');
+            fprintf( fid, 'zAspect="%.2f"\n', zAspect);
+            fclose(fid);
+            
+
+            
+%             MasterFileNameOnAnalysisBox = ['/RazorScopeData/RazorScopeImages/' pth '/Processing/master'];
+%             
+%             %prepare list of commmands to run
+%             stepsFileName = fullfile(procDirName,'steps');
+%             fid = fopen(stepsFileName, 'wt' );
+%             fprintf( fid, 'This is a description of the steps needed for SPIM analysis.\n\n\n' );
+%             fprintf( fid, 'Open terminal window and cd to the processing folder within the experiment.\n\n' );
+%             fprintf( fid, 'run ./MakeXMLDatasetJobSets.sh .\n\n' );
+%             fprintf( fid, 'run ./MakeHDFExportJobsSets.sh .\n\n' );
+%             fprintf( fid, 'cd into ./xmljobs .\n\n' );
+%             fprintf( fid, 'run ./DefineXML.job . This will take some time, so go rest and do some other things.\n\n' );
+%             fprintf( fid, 'once done, cd ../hdf5jobs .\n\n' );
+%             fprintf( fid, 'remove the old log file: rm /tmp/log .\n\n' );
+%             fprintf( fid, 'run parallel --memfree 24G --delay 15 --retry-failed --joblog /tmp/log < commands.txt .\n\n' );
+%             fprintf( fid, 'This to will take some time, so go rest and do some other things.\n\n' );
+%             fprintf( fid, 'Once this is done, the dataset is now saved in HDF5 format.\n Open the set using BigStitcher to make sure everything is fine and delete the Tiffs. Time to start aligning.\n\n\n' );
+%             fprintf( fid, 'First, we need to move the tiles to their location from TileConfiguration. Unfortunately this hasn`t been implemented in batch mode yet. Open BigStitcher and load the dataset. Right-click on any stack and select `Arrange Views-->Read Locations From File` etc. \n\n' );
+%             fprintf( fid, 'save and close Fiji.\n\n' );
+%             fprintf( fid, 'Open terminal, cd to the dataset under .../RazorScopeSets/... .\n\n' );
+%             fprintf( fid, 'run ./MakeCalculateShiftJobs.sh .\n\n' );
+%             fprintf( fid, 'run ./MakeFindPoinsJobs.sh .\n\n' );
+%             fprintf( fid, 'cd into ./shiftjobs .\n\n' );
+%             fprintf( fid, 'remove the old log file: rm /tmp/log .\n\n' );
+%             fprintf( fid, 'run parallel -j1 --retry-failed --joblog /tmp/log < commands.txt .\n\n' );
+%             fprintf( fid, 'This will, again (!) take some time, so go rest and do some other things.\n\n' );
+%             fprintf( fid, 'once done, cd ../beadsjobs .\n\n' );
+%             fprintf( fid, 'run ./findPoints.job  ./n' );
+% 
+% 
+%             
+%             
+% 
+%             fclose(fid);
+
+            end
     end
     
 end
