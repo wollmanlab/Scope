@@ -393,6 +393,8 @@ classdef (Abstract) Scope < handle
             builder = Scp.studio.data().getCoordsBuilder().z(0).channel(0).stagePosition(0);
             curFrame = 0;
             Scp.mmc.startSequenceAcquisition(NFrames, 0, false);
+            tToc = toc;
+            pause(0.4-tToc);
             toc;
             while((Scp.mmc.getRemainingImageCount()>0) || (Scp.mmc.isSequenceRunning(Scp.mmc.getCameraDevice())))
                 if (Scp.mmc.getRemainingImageCount()>0)
@@ -403,7 +405,7 @@ classdef (Abstract) Scope < handle
                     clear timg;
                     Scp.mmc.getRemainingImageCount();
                 else
-                    Scp.mmc.sleep(min(0.25*Scp.Exposure,1));
+                    Scp.mmc.sleep(min(0.5*Scp.Exposure,5));
                 end
             end
             
