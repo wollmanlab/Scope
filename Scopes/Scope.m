@@ -1144,6 +1144,7 @@ classdef (Abstract) Scope < handle
             Scp.currentAcq=Scp.currentAcq+1;
             arg.msk = true(Plt.sz);
             arg.wells = Plt.Wells;
+            arg.axis={'XY'};
             arg.sitesperwell = [1 1]; % [x y]
             arg.alignsites = 'center';
             arg.sitesshape = 'grid';
@@ -1190,6 +1191,7 @@ classdef (Abstract) Scope < handle
             else
                 Pos=Positions;
             end
+            Pos.axis = arg.axis;
             Pos.PlateType = Plt.type;
             
             %% add to the position list well by well
@@ -1218,8 +1220,13 @@ classdef (Abstract) Scope < handle
                 end
                 
                 %% set up XY
-                WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY];
-                
+                if Pos.axis{1}=='XY'
+                    WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY];
+                elseif numel(Pos.axis)==2
+                    WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY];
+                elseif numel(Pos.axis)==3
+                    WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY, Scp.Z];
+                end
                 
                 %% add up to long list
                 Pos = add(Pos,WellXY,WellLabels);

@@ -32,13 +32,13 @@ classdef IncuScope < Scope
                 Scp.initTempHumSenor;
                 if strcmp(chnl,'Brightfield')
                     % do this
-                    fwrite(Scp.SHT15port,'bright ,2')
+                    fwrite(Scp.SHT15port,'bright ,20')
                 else
                     % make sure brightfield if off
                     fwrite(Scp.SHT15port,'bright ,0')
                 end
                 % figure out what dichroic we need and move there. 
-                Scp.ASI.moveASI('F',Scp.DichroicsPerChannel.(chnl)); 
+                %Scp.ASI.moveASI('F',Scp.DichroicsPerChannel.(chnl)); 
                 
                 % set Em/Ex using MM
                 setChannel@Scope(Scp,chnl)
@@ -70,53 +70,53 @@ classdef IncuScope < Scope
                 end
             end
             
-            % XY axis are fli
-            function setX(Scp,X)
-                Scp.ASI.moveASI('Y',X); 
-%                 Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,Scp.Y,X)
-%                 Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage')); 
-            end
-            
-            function setY(Scp,Y)
-                Scp.ASI.moveASI('X',Y); 
-%                 Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,Y,Scp.X)
-%                 Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage')); 
-            end
-            
-            function setZ(Scp,Z)
-                Scp.ASI.moveASI('Z',Z); 
-%                 Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,Y,Scp.X)
-%                 Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage')); 
-            end
-            
-            function X=getX(Scp)
-                X = Scp.ASI.whereAmI('Y'); 
-                 %X=Scp.mmc.getYPosition(Scp.mmc.getXYStageDevice);
-                 
-            end
-            function Y=getY(Scp)
-                 %Y=Scp.mmc.getXPosition(Scp.mmc.getXYStageDevice);
-                 Y = Scp.ASI.whereAmI('X'); 
-            end
-            
-            function Z=getZ(Scp)
-                %Y=Scp.mmc.getXPosition(Scp.mmc.getXYStageDevice);
-                Z = Scp.ASI.whereAmI('Z');
-            end
-
-            function setXY(Scp,XY)
-                currXY = Scp.XY;
-                dist = sqrt(sum((currXY-XY).^2));
-                if Scp.XYpercision >0 && dist < Scp.XYpercision
-                    fprintf('movment too small - skipping XY movement\n');
-                    return
-                end
-                Scp.ASI.moveASI('XY',XY([2,1])); 
-                %Scp.setX(XY(1)); 
-                %Scp.setY(XY(2)); 
-%                 Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(2),XY(1))
-%                 Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
-            end
+%             % XY axis are fli
+             function setX(Scp,X)
+%                 Scp.ASI.moveASI('Y',X); 
+                 Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,Scp.Y,X)
+                 Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage')); 
+             end
+%             
+             function setY(Scp,Y)
+%                 Scp.ASI.moveASI('X',Y); 
+                 Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,Y,Scp.X)
+                 Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage')); 
+             end
+%             
+%              function setZ(Scp,Z)
+% %                 Scp.ASI.moveASI('Z',Z); 
+%                  Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,Y,Scp.X)
+%                  Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage')); 
+%              end
+%             
+             function X=getX(Scp)
+%                 X = Scp.ASI.whereAmI('Y'); 
+                 X=Scp.mmc.getYPosition(Scp.mmc.getXYStageDevice);
+%                  
+             end
+             function Y=getY(Scp)
+                  Y=Scp.mmc.getXPosition(Scp.mmc.getXYStageDevice);
+%                  Y = Scp.ASI.whereAmI('X'); 
+             end
+%             
+%             function Z=getZ(Scp)
+%                 %Y=Scp.mmc.getXPosition(Scp.mmc.getXYStageDevice);
+%                 Z = Scp.ASI.whereAmI('Z');
+%             end
+% 
+             function setXY(Scp,XY)
+                 currXY = Scp.XY;
+                 dist = sqrt(sum((currXY-XY).^2));
+                 if Scp.XYpercision >0 && dist < Scp.XYpercision
+                     fprintf('movment too small - skipping XY movement\n');
+                     return
+                 end
+%                 Scp.ASI.moveASI('XY',XY([2,1])); 
+%                 %Scp.setX(XY(1)); 
+%                 %Scp.setY(XY(2)); 
+                  Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(2),XY(1))
+                  Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+             end
             
             function logError(Scp,msg,varargin)
                 Scp.DieOnError=false; 
@@ -225,7 +225,7 @@ classdef IncuScope < Scope
             end
             
             function focusAdjust(Scp,varargin)
-                arg.Diff = -30;
+                arg.Diff = 0;
                 arg.scale = 2; % if True will acq multiple channels per Z movement.
                 arg.resize =1;
                 arg.channel = 'DeepBlue'; % if True will acq multiple channels per Z movement.
