@@ -129,9 +129,24 @@ classdef IncuScope < Scope
                 fltname=Scp.Channel;
             end
             
+           
+            function [z,s]=autofocus(Scp)
+            z=nan;
+            s=nan;
+            switch lower(Scp.AutoFocusType)
+                case 'none'
+                    disp('No autofocus used');
+                case 'hardware'                    
+                    disp('autofocus using crisp');
+                    Scp.studio.autofocusNow();
+                case 'software'
+                    Zfocus = ImageBasedFocusHillClimb('channel',AcqData.Channel,'exposure',AcqData.Exposure); 
+                    Scp.Z=Zfocus; 
+                otherwise
+                    error('Please define type of autofocus (as None if none exist)')
+            end
             
-            
-            
+        end
             
             function Zfocus = ImageBasedFocusHillClimb(Scp,varargin)
                 %Works pretty well with BF:
@@ -139,15 +154,15 @@ classdef IncuScope < Scope
                 %Works really well with Hoescht:
                 %Scp.ImageBasedFocusHillClimb('channel','Brightfield','exposure',20,'resize',0.25,'scale',50)
                 
-                arg.scale = 2; % if True will acq multiple channels per Z movement.
-                arg.resize =1;
-                arg.channel = 'DeepBlue'; % if True will acq multiple channels per Z movement.
-                arg.exposure =10;
+                arg.scale = Scp.AFparam.scale; % if True will acq multiple channels per Z movement.
+                arg.resize =Scp.AFparam.resize;
+                arg.channel = Scp.AFparam.channel; % if True will acq multiple channels per Z movement.
+                arg.exposure =Scp.AFparam.exposure;
                 % False will acq a Z stack per color.
                 arg = parseVarargin(varargin,arg);
                 %% Set channels and exposure
-                    Scp.Channel=arg.channel;
-                    Scp.Exposure=arg.exposure;
+                Scp.Channel=arg.channel;
+                Scp.Exposure=arg.exposure;
                 
                 
                 figure(157),

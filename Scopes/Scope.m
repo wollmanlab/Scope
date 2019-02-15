@@ -73,6 +73,8 @@ classdef (Abstract) Scope < handle
         %% software image based autofocus related parameters
         AutoFocusType = 'Hardware'; % Software / Hardware / DefiniteFocus / None
         autogrid=10;
+        AFparam=struct('scale',2,'resize',1,'channel','DeepBlue','exposure',10); 
+        
         AFgrid
         AFscr
         AFlog=struct('Time',[],'Z',[],'Score',[],'Channel','','Type','');
@@ -696,7 +698,7 @@ classdef (Abstract) Scope < handle
              warning('Not implemented in Scope - overload to use!')
         end
         
-        function [z,s]=autofocus(Scp,AcqData) %#ok<STOUT,INUSD>
+        function [z,s]=autofocus(Scp) %#ok<STOUT,INUSD>
             warning('Not implemented in Scope - overload to use!')
         end
         
@@ -1233,7 +1235,7 @@ classdef (Abstract) Scope < handle
                 %% add up to long list
                 Pos = add(Pos,WellXY,WellLabels);
                 
-            end
+                endwhi
             
             %% add experiment metadata
             if ~arg.tmp
