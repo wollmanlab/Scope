@@ -1235,7 +1235,7 @@ classdef (Abstract) Scope < handle
                 %% add up to long list
                 Pos = add(Pos,WellXY,WellLabels);
                 
-                endwhi
+            end
             
             %% add experiment metadata
             if ~arg.tmp
