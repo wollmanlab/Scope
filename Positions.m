@@ -15,6 +15,7 @@ classdef Positions < handle
         
         Skip=[];                 
                         
+        zOffset = 0;
         
         axis = {'XY'};
         ordr
@@ -230,7 +231,7 @@ classdef Positions < handle
             end
         end
         
-        function label = peek(Pos,varargin)
+        function [label, ix] = peek(Pos,varargin)
             arg.group = false; 
             arg = parseVarargin(varargin,arg); 
             
@@ -475,6 +476,37 @@ classdef Positions < handle
         function regParams = getTform(Pos,varargin)
             regParams=[1 0 0; 0 1 0; 0 0 1]; 
         end
+        
+
+        function setOffsets(Pos, softAF)
+            if ~isequal(Pos.axis,{'X'    'Y'    'Z'});
+                error('must have 3 axes for software autofocus')
+            end
+            XYZ = Pos.List;
+            Pos.zOffset = XYZ(:,3) - softAF.Zpredict(XYZ(:,1:2));
+        end
+        
+        function updateZPos(Pos,Scp,softAF)
+            if ~isequal(Pos.axis,{'X'    'Y'    'Z'})
+                error('must have 3 axes for software autofocus')
+            end
+            XYZ = Pos.List;
+            
+            %find the new focal plane
+            softAF.findFocusMarks(Scp, 'channel','Brightfield','exposure',40,'resize',0.25,'scale',50);
+            XYZ(:,3) = softAF.Zpredict(XYZ(:,1:2)) + Pos.zOffset;
+            Pos.List = XYZ;
+        end
+        
+        function zOff = getzOffset(Pos)
+            if numel(Pos.zOffset)==1
+                zOff = Pos.zOffset;
+            else
+                [~,ix] =Pos.peek;
+                zOff = Pos.zOffset(ix);
+            end
+        end
+        
         
     end
     
