@@ -6,11 +6,25 @@ classdef RazorScope < Scope
         ZStage
         LaserTrigger;
         refImage;
+        dZ;
     end
     
+    properties (Dependent)
+        imagingVelocity;
+    end
+    
+    
     methods
+        function vel = get.imagingVelocity(Scp)
+            vel = find(1000*Scp.dZ./Scp.ZStage.Vlist>=10,1,'last');
+        end
+        
+        
+        
+        
         function autofocus(Scp)
         end
+        
         function Objective = getObjective(Scp)
             Objective = 'You Guys miss Yanfei, yet?, yes we do....';
         end
@@ -91,16 +105,18 @@ classdef RazorScope < Scope
         %             end
         %         end
         
-        function setRefImage(Scp,AcqData)
+        function setRefImage(Scp,AcqData,ind)
+            refImgInd = ind;
             Scp.Channel = AcqData(1).Channel;
-            Scp.goto(Scp.Pos.Labels{5}, Scp.Pos); %go to first position       
+            Scp.goto(Scp.Pos.Labels{refImgInd}, Scp.Pos); %go to first position
             Scp.refImage = Scp.snapImage;%snap an image
         end
         
-        function ref = DriftAdjust(Scp,AcqData)
+        function ref = DriftAdjust(Scp,AcqData, ind)
+            refImgInd = ind;
             ref = Scp.refImage;
             Scp.Channel = AcqData(1).Channel;
-            Scp.goto(Scp.Pos.Labels{5}, Scp.Pos); %go to first position
+            Scp.goto(Scp.Pos.Labels{refImgInd}, Scp.Pos); %go to first position
             
             img = Scp.snapImage;%snap an image
             imXcorr = convnfft(ref-mean(ref(:)),rot90(img,2)-mean(img(:)),'same');%compare image to input ref
@@ -110,7 +126,7 @@ classdef RazorScope < Scope
             dX = maxX-size(img,2)/2
             Scp.Pos.List(:,1) = Scp.Pos.List(:,1)-dX; %update position list
             Scp.Pos.List(:,2) = Scp.Pos.List(:,2)-dY; %update position list
-            Scp.goto(Scp.Pos.Labels{5}, Scp.Pos); %take new ref for next r0und
+            Scp.goto(Scp.Pos.Labels{refImgInd}, Scp.Pos); %take new ref for next r0und
             
             img = Scp.snapImage;%snap an image
             imXcorr = convnfft(ref-mean(ref(:)),rot90(img,2)-mean(img(:)),'same');%compare image to input ref
@@ -120,7 +136,7 @@ classdef RazorScope < Scope
             dX = maxX-size(img,2)/2;
             Scp.Pos.List(:,1) = Scp.Pos.List(:,1)-dX; %update position list
             Scp.Pos.List(:,2) = Scp.Pos.List(:,2)-dY; %update position list
-            Scp.goto(Scp.Pos.Labels{5}, Scp.Pos); %take new ref for next r0und
+            Scp.goto(Scp.Pos.Labels{refImgInd}, Scp.Pos); %take new ref for next r0und
             
             ref = Scp.snapImage;
         end
@@ -133,7 +149,7 @@ classdef RazorScope < Scope
             nFrames = zeros(4,1);
             ListSide = cell(4,1);
             
-            Pos = Positions([],'axis',{'X', 'Y','Z','Angle'})
+            Pos = Positions([],'axis',{'X', 'Y','Z','Angle'});
             %clear MM list
             
             %create grid over cornea quadrant
@@ -155,7 +171,7 @@ classdef RazorScope < Scope
                 uiwait(469);
                 delZ = Scp.Z-min(ListSide{i}(:,3));
                 if i==1;
-                    [nFrames(i), dZ] = nFramesNdZ(Scp,delZ, 'crop', false);
+                    [nFrames(i), dZ] = nFramesNdZ(Scp,delZ, 'crop', false, 'dZ', Scp.dZ);
                 else
                     [nFrames(i), ~] = nFramesNdZ(Scp,delZ, 'crop', true, 'dZ', dZ);
                 end
@@ -205,6 +221,80 @@ classdef RazorScope < Scope
         
         
         
+        function [nFrames, dZ] = createCorneaHalves(Scp)
+            %open empty position list with 4 axes
+            nFrames = zeros(2,1);
+            ListSide = cell(2,1);
+            
+            Pos = Positions([],'axis',{'X', 'Y','Z','Angle'});
+            %clear MM list
+            
+            %create grid over cornea quadrant
+            for i=1:2
+                pl = Scp.studio.getPositionList;
+                pl.clearAllPositions;
+                
+                Scp.studio.showPositionList;
+                Scp.createPositionFromMM('axis', {'X' 'Y' 'Z'}, 'message', 'please mark top, bottom and edge of cornea');
+                ListSide{i} = Scp.createGridPosition(Scp.Pos.List);
+                Angle1 = Scp.Angle;
+                ListSide{i} = [ListSide{i}, repmat(Angle1,size(ListSide{i},1),1)];
+                
+                %find # of Z stacks to take. Maxed at 428. Could either crop or
+                %strech Z steps using varargin in nFramesNdZ
+                figure(469)
+                set(469,'Windowstyle','normal','toolbar','none','menubar','none','Position',[700 892 300 75],'Name','Please move to top Z position','NumberTitle','off')
+                uicontrol(469,'Style', 'pushbutton', 'String','Done','Position',[100 20 100 35],'fontsize',13,'callback',@(~,~) close(469))
+                uiwait(469);
+                delZ = Scp.Z-min(ListSide{i}(:,3));
+                if i==1;
+                    [nFrames(i), dZ] = nFramesNdZ(Scp,delZ, 'crop', false, 'dZ', Scp.dZ);
+                else
+                    [nFrames(i), ~] = nFramesNdZ(Scp,delZ, 'crop', true, 'dZ', dZ);
+                end
+                %Rotate 90 deg
+                Scp.Angle = Scp.Angle+90;
+                clear pl;
+            end
+            %%
+            %merge all to one list
+            Pos.List = cell2mat(ListSide);
+            
+            % Make position labels and metadata
+            Labels = {};
+            Groups = {};
+            Tiles = {};
+            Counter =1;
+            
+            for i=1:size(ListSide,1)
+                if ~isempty(ListSide{i})
+                    for ix=1:numel(unique(ListSide{i}(:,1)))
+                        for jx=1:numel(unique(ListSide{i}(:,2)))
+                            Labels{Counter} = sprintf('Theta%03d_X%d_Y%d_tile%02d',90*(i-1),ix,jx,Counter-1);
+                            Groups{Counter} = sprintf('Theta_%03d',mod(round(ListSide{i}((ix-1)*numel(unique(ListSide{i}(:,2)))+jx,4)),360));
+                            Tiles{Counter} = num2str(Counter-1);
+                            Counter = Counter+1;
+                        end
+                    end
+                end
+            end
+            
+            %Populate Position fields
+            Pos.Labels = Labels;
+            Pos.Group = Groups;
+            % create metadata containing dZ and # frames per stack on eachside
+            frmVec = [];
+            for i=1:size(ListSide,1)
+                frmVec = [frmVec repmat(nFrames(i),1,size(ListSide{i},1))];
+            end
+            ExpData= struct('nFrames', num2cell(frmVec),'dz',num2cell(repmat(dZ,1,size(Pos.List,1))),'Tile',Tiles);
+            
+            Pos.ExperimentMetadata = ExpData;
+            
+            Scp.Pos = Pos
+        end
+        
+        
         
         function [Pos, ExpData] = createStackPositions(Scp)
             %open empty position list with 4 axes
@@ -233,7 +323,7 @@ classdef RazorScope < Scope
                 uiwait(469);
                 delZ = Scp.Z-min(ListSide{i}(:,3));
                 if i==1;
-                    [nFrames(i), dZ] = nFramesNdZ(Scp,delZ, 'crop', false);
+                    [nFrames(i), dZ] = nFramesNdZ(Scp,delZ, 'crop', false, 'dZ', Scp.dZ);
                 else
                     [nFrames(i), ~] = nFramesNdZ(Scp,delZ, 'crop', true, 'dZ', dZ);
                 end
@@ -306,14 +396,14 @@ classdef RazorScope < Scope
             uicontrol(469,'Style', 'pushbutton', 'String','Done','Position',[100 20 100 35],'fontsize',13,'callback',@(~,~) close(469))
             uiwait(469);
             delZ = Scp.Z-min(ListSide1(:,3));
-            [nFrames1, dZ] = nFramesNdZ(Scp,delZ, 'crop', false);
+            [nFrames1, dZ] = nFramesNdZ(Scp,delZ, 'crop', false, 'dZ', Scp.dZ);
             
             %clear MM list
             pl = Scp.studio.getPositionList;
             pl.clearAllPositions;
             Scp.studio.showPositionList
             %rotate cornea 180 degrees
-            Scp.Angle = Scp.Angle+180;
+            Scp.Angle = Scp.Angle+90;
             
             %repeat other side
             Scp.createPositionFromMM('axis', {'X' 'Y' 'Z'}, 'message', 'please mark top, bottom and edge of cornea');
@@ -368,6 +458,15 @@ classdef RazorScope < Scope
             Scp.Pos = Pos;
         end
         
+        
+        
+        
+        
+        
+        
+        
+        
+        
         % calculates position of tiles so that overlap is maxed while
         % capturing all positions
         function [nFrames, dZ] = nFramesNdZ(Scp,delZ, varargin)
@@ -387,7 +486,7 @@ classdef RazorScope < Scope
                 end
             end
             %Set exposure so that stage moves dZ during a cycle.
-            Scp.ZStage.Velocity=8;
+            Scp.ZStage.Velocity=Scp.imagingVelocity;
             Scp.Exposure = 1000*dZ/Scp.ZStage.VelocityUm;
         end
         
@@ -459,57 +558,57 @@ classdef RazorScope < Scope
         %
         %
         
-        %% gui
-        function LiveSnapWindow(Scp)
-            global KEY_IS_PRESSED
-            
-            figure(477);
-            set(477,'Windowstyle','normal','toolbar','none','menubar','none','Position',[100 500 250 150],'Name','Snap Snap','NumberTitle','off')
-            h = uicontrol(477,'Style', 'pushbutton','Position',[50 75 150 50],'fontsize',13, 'String', 'Snap', 'callback',@(x,y) SnapCallback(x,y,Scp));
-            function SnapCallback(hObject, event, Scp)
-                Scp.snapImage;
-            end
-            
-            %Live
-            h = uicontrol(477,'Style', 'togglebutton','Position',[50 25 150 50],'fontsize',13, 'String', 'Live', 'Value',1,'callback',@(x,y) LiveClbk(x,y,Scp));
-            KEY_IS_PRESSED = h.Value;
-            function stpLiveClbk(hObject, event, Scp)
-                KEY_IS_PRESSED  = 1;
-                h = uicontrol(477,'Style', 'togglebutton','Position',[50 25 150 50],'fontsize',13, 'String', 'Live', 'Value',1,'callback',@(x,y) LiveClbk(x,y,Scp));
-                Scp.mmc.setShutterOpen(false);
-            end
-            
-            function LiveClbk(hObject, event, Scp)
-                
-                h = uicontrol(477,'Style', 'togglebutton','Position',[50 25 150 50],'fontsize',13, 'String', 'Stop', 'Value',0,'callback',@(x,y) stpLiveClbk(x,y,Scp));
-                KEY_IS_PRESSED = h.Value;
-                Scp.mmc.setShutterOpen(true);
-                try
-                    calllib('SpinnakerC_v140','spinCameraBeginAcquisition',Scp.Camera.Camera);
-                    while ~KEY_IS_PRESSED
-                        drawnow
-                        hResultImage  =  libpointer('voidPtr');
-                        calllib('SpinnakerC_v140','spinCameraGetNextImage',Scp.Camera.Camera,hResultImage);
-                        hConvertedImage = libpointer('voidPtr');%This does not live on the camera
-                        calllib('SpinnakerC_v140','spinImageCreateEmpty',hConvertedImage);
-                        calllib('SpinnakerC_v140','spinImageConvert',hResultImage,'PixelFormat_Mono16',hConvertedImage);
-                        
-                        gData = libpointer('int16Ptr',zeros(Scp.Camera.Width*Scp.Camera.Height,1));
-                        calllib('SpinnakerC_v140','spinImageGetData',hConvertedImage,gData);
-                        Scp.studio.displayImage(gData.Value);
-                        
-                        calllib('SpinnakerC_v140','spinImageRelease',hResultImage);
-                    end
-                    
-                    calllib('SpinnakerC_v140','spinCameraEndAcquisition',Scp.Camera.Camera);
-                catch
-                    disp('something went horribly wrong!')
-                    %calllib('SpinnakerC_v140','spinImageDestroy',hConvertedImage);
-                    calllib('SpinnakerC_v140','spinImageRelease',hResultImage);
-                    calllib('SpinnakerC_v140','spinCameraEndAcquisition',Scp.Camera.Camera);
-                end
-            end
-        end
+%         %% gui
+%         function LiveSnapWindow(Scp)
+%             global KEY_IS_PRESSED
+%             
+%             figure(477);
+%             set(477,'Windowstyle','normal','toolbar','none','menubar','none','Position',[100 500 250 150],'Name','Snap Snap','NumberTitle','off')
+%             h = uicontrol(477,'Style', 'pushbutton','Position',[50 75 150 50],'fontsize',13, 'String', 'Snap', 'callback',@(x,y) SnapCallback(x,y,Scp));
+%             function SnapCallback(hObject, event, Scp)
+%                 Scp.snapImage;
+%             end
+%             
+%             %Live
+%             h = uicontrol(477,'Style', 'togglebutton','Position',[50 25 150 50],'fontsize',13, 'String', 'Live', 'Value',1,'callback',@(x,y) LiveClbk(x,y,Scp));
+%             KEY_IS_PRESSED = h.Value;
+%             function stpLiveClbk(hObject, event, Scp)
+%                 KEY_IS_PRESSED  = 1;
+%                 h = uicontrol(477,'Style', 'togglebutton','Position',[50 25 150 50],'fontsize',13, 'String', 'Live', 'Value',1,'callback',@(x,y) LiveClbk(x,y,Scp));
+%                 Scp.mmc.setShutterOpen(false);
+%             end
+%             
+%             function LiveClbk(hObject, event, Scp)
+%                 
+%                 h = uicontrol(477,'Style', 'togglebutton','Position',[50 25 150 50],'fontsize',13, 'String', 'Stop', 'Value',0,'callback',@(x,y) stpLiveClbk(x,y,Scp));
+%                 KEY_IS_PRESSED = h.Value;
+%                 Scp.mmc.setShutterOpen(true);
+%                 try
+%                     calllib('SpinnakerC_v140','spinCameraBeginAcquisition',Scp.Camera.Camera);
+%                     while ~KEY_IS_PRESSED
+%                         drawnow
+%                         hResultImage  =  libpointer('voidPtr');
+%                         calllib('SpinnakerC_v140','spinCameraGetNextImage',Scp.Camera.Camera,hResultImage);
+%                         hConvertedImage = libpointer('voidPtr');%This does not live on the camera
+%                         calllib('SpinnakerC_v140','spinImageCreateEmpty',hConvertedImage);
+%                         calllib('SpinnakerC_v140','spinImageConvert',hResultImage,'PixelFormat_Mono16',hConvertedImage);
+%                         
+%                         gData = libpointer('int16Ptr',zeros(Scp.Camera.Width*Scp.Camera.Height,1));
+%                         calllib('SpinnakerC_v140','spinImageGetData',hConvertedImage,gData);
+%                         Scp.studio.displayImage(gData.Value);
+%                         
+%                         calllib('SpinnakerC_v140','spinImageRelease',hResultImage);
+%                     end
+%                     
+%                     calllib('SpinnakerC_v140','spinCameraEndAcquisition',Scp.Camera.Camera);
+%                 catch
+%                     disp('something went horribly wrong!')
+%                     %calllib('SpinnakerC_v140','spinImageDestroy',hConvertedImage);
+%                     calllib('SpinnakerC_v140','spinImageRelease',hResultImage);
+%                     calllib('SpinnakerC_v140','spinCameraEndAcquisition',Scp.Camera.Camera);
+%                 end
+%             end
+%         end
         
         
         
@@ -522,7 +621,304 @@ classdef RazorScope < Scope
         
         
         
-        function prepareProcessingFiles(Scp)
+%        function prepareProcessingFiles(Scp)           
+%             procDirName = [Scp.MD.pth '/Processing'];
+%             if ~isdir(procDirName)
+%                 mkdir(procDirName);
+%             end
+%             masterFileName = fullfile(procDirName,'master');
+%             fid = fopen(masterFileName, 'wt' );
+%             fprintf( fid, '%s\n', 'basedirfrom="/RazorScopeData/RazorScopeImages"');
+%             fprintf( fid, '%s\n', 'basedirto="/RazorScopeData/RazorScopeSets"');
+%             fprintf( fid, '%s\n\n', 'repodir="/home/wollmanlab/Documents/Repos/bigstitchparallel"');
+%             
+%             fprintf( fid, '%s\n', 'xmljobs_export="/Processing/xmljobs"');
+%             fprintf( fid, '%s\n', 'hdf5jobs_export="/Processing/hdf5jobs"');
+%             fprintf( fid, '%s\n', 'shiftjobs_export="/Processing/shiftjobs"');
+%             fprintf( fid, '%s\n', 'optjobs_export="/Processing/optjobs"');
+%             fprintf( fid, '%s\n', 'beadsjobs_export="/Processing/beadsjobs"');
+%             fprintf( fid, '%s\n', 'ICPjobs_export="/Processing/ICPjobs"');
+%             fprintf( fid, '%s\n', 'Multiviewjobs_export="/Processing/multiviewjobs"');
+%             fprintf( fid, '%s\n', 'Stabilizejobs_export="/Processing/stabilizejobs"');
+%             fprintf( fid, '%s\n', 'fusejobs_export="/Processing/fusejobs"');
+%             fprintf( fid, '%s\n\n', 'fused_dir="/Fused"');
+%             
+%             pth = Scp.MD.pth;
+%             pth = pth(strfind(Scp.MD.pth,Scp.Username)-1:end);
+%             pth = strrep(pth,'\','/');
+%             fprintf( fid, 'pth="%s"\n\n', pth);
+%             
+%             nTimePoint = numel(Scp.MD.unique('frame'));
+%             nChannels = numel(Scp.MD.unique('Channel'));
+%             nTiles = numel(Scp.MD.unique('Tile'));
+%             nAngles = numel(Scp.MD.unique('group'));
+%             
+%             unqPos = unique(Scp.Pos.Group);         
+%             fixPos = 0;
+%             for i=1:numel(unqPos)-1
+%                 fixPos = [fixPos sum(strcmp(unqPos{i},Scp.Pos.Group))];
+%             end
+%             fixPos = mat2str(fliplr(fixPos));
+%             fixPos = fixPos(2:end-1);
+%             nPos = 1;
+%             
+%             fprintf( fid, 'timepoints="%d"\n',nTimePoint );
+%             fprintf( fid, 'channels="%d"\n', nChannels);
+%             fprintf( fid, 'tiles="%d"\n', nTiles);
+%             fprintf( fid, 'angles="%d"\n', nAngles);
+%             fprintf( fid, 'pos="%d"\n\n', nPos);
+%             fprintf( fid, 'fixPos="%s"\n\n', fixPos);
+%             
+%             zAspect = Scp.MD.unique('dz')./Scp.MD.unique('PixelSize');
+%             fprintf( fid, 'zAspect="%.2f"\n', zAspect);
+%             fclose(fid);
+%             
+%             
+%           
+%             
+%             
+%            %make steps file 
+%             procDirName = [Scp.MD.pth '/Processing'];
+%             if ~isdir(procDirName)
+%                 mkdir(procDirName);
+%             end
+%             
+%             pth = Scp.MD.pth;
+%             pth = pth(strfind(Scp.MD.pth,Scp.Username)-1:end);
+%             pth = strrep(pth,'\','/')
+%             
+%             nChannels = numel(Scp.MD.unique('Channel'));
+%       
+%             repoDir = '/home/wollmanlab/Documents/Repos/bigstitchparallel';
+%             FullPathOnAnalysisBox = ['/RazorScopeData/RazorScopeImages' pth];
+%             FullPathSetsOnAnalysisBox = ['/RazorScopeData/RazorScopeSets' pth];
+%             MasterFileNameOnAnalysisBox = [FullPathOnAnalysisBox '/Processing/master'];
+%             
+%             stepsFileName = fullfile(procDirName,'steps');
+%             fid = fopen(stepsFileName, 'wt' );
+%             
+%             fprintf( fid, 'Open terminal window and run:\n\n');
+%             fprintf( fid, 'cd "%s"\n\n', repoDir);
+%             %fprintf( fid, './MakeXMLDatasetJobSets.sh "%s"\n', MasterFileNameOnAnalysisBox);
+%             %fprintf( fid, '%s/Processing/xmljobs/DefineXML.job\n\n', FullPathOnAnalysisBox);
+%             %fprintf( fid, 'This will take some time, so go rest and do some productive things.\n\n');
+%             %fprintf( fid, 'Next, run:\n\n');
+%             fprintf( fid, './MakeHDFExportJobsSets.sh "%s"\n', MasterFileNameOnAnalysisBox);
+%             fprintf( fid, 'parallel --memfree -24G --load 90%% --delay 10 -j16 --retry-failed < %s/Processing/hdf5jobs/commands.txt\n\n', FullPathOnAnalysisBox);
+%             fprintf( fid, 'This will take some time, so go rest and do some productive things.\n\n');
+%             fprintf( fid, 'Once this is done, the dataset is now saved in HDF5 format.\n\n\nOpen the set using BigStitcher to make sure everything is fine and delete the Tiffs. Time to start aligning!\n\n' );
+%             %     fprintf( fid, 'First, we need to move the tiles to their location from the Tile Configuration File.\nUnfortunately this hasn`t been implemented in batch mode yet. Open BigStitcher and load the dataset.\nRight-click on any stack and select `Arrange Views-->Read Locations From File` etc. \n' );
+%             
+%             fprintf( fid, 'First, we need to move the tiles to their location from the Tile Configuration File.\n');
+%             fprintf( fid, 'cd "%s"\n\n', repoDir);
+%             
+%             fprintf( fid, './MakeLoadConfig.sh "%s"\n', MasterFileNameOnAnalysisBox);
+%             fprintf( fid, '%s/Processing/LoadTileConfig.job\n\n', FullPathSetsOnAnalysisBox);
+%             fprintf( fid, 'Next, we calculate the shifts between tiles using cross-correlation.\n');
+% 
+%             fprintf( fid, './MakeCalculateShiftJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+%             fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j8 --retry-failed < %s/Processing/shiftjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
+%             
+%             fprintf( fid, 'Filter links and apply shifts using global optimization.\n');
+% 
+%             fprintf( fid, './MakeFilterAndOptimizeJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+%             fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j8 --retry-failed < %s/Processing/shiftjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
+%                       
+%             
+%             fprintf( fid, 'Merge the files created by different processes.\n');
+% 
+%             fprintf( fid, '%s/Processing/MergeXMLs.sh\n\n', FullPathSetsOnAnalysisBox);
+% 
+%             fprintf( fid, 'Find interest points for the next steps.\n');
+%             
+%             fprintf( fid, './MakeFindPointsJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+%             fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j12 --retry-failed < %s/Processing/beadsjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
+%             fprintf( fid, '%s/Processing/MergeXMLs.sh\n', FullPathSetsOnAnalysisBox);
+%             %fprintf( fid, '%s/Processing/beadsjobs/commands.sh\n\n', FullPathSetsOnAnalysisBox);
+%             
+%              if nChannels>1 %ICP refinement for chromatic aberations
+%                 fprintf( fid, 'Since we have more than 1 channel, we want to fix some "chromatic aberations".\n\n');
+%                 fprintf( fid, 'cd "%s"\n', repoDir);
+%                 fprintf( fid, './MakeICPJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+% %                fprintf( fid, '%s/Processing/ICPjobs/commands.sh\n\n', FullPathSetsOnAnalysisBox);
+%                 fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j16 --retry-failed < %s/Processing/ICPjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
+%                 fprintf( fid, '%s/Processing/MergeXMLs.sh\n', FullPathSetsOnAnalysisBox);
+%              end      
+%             
+%             
+%             fprintf( fid, 'At this point, we`ve finished stitching all the tiles together. We still need to stitch the different angles.\n' );
+%             fprintf( fid, 'Open Fiji and open the set with BigStitcher. Make sure that tile registration looks ok.\n' );
+%             fprintf( fid, 'Now, align the first timepoint using the BDV GUI. Make sure everything looks right.\n' );
+%             fprintf( fid, 'save and close Fiji.\n\n' );
+%             fprintf( fid, 'We align iteratively by inhereting all the previous transformations.\n\n' );
+%             fprintf( fid, 'cd "%s"\n', repoDir);
+%             fprintf( fid, './MakeMultiviewPropJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+%             fprintf( fid, '%s/Processing/multiviewjobs/MultiviewProp.job\n\n', FullPathSetsOnAnalysisBox);
+%             
+% 
+%             
+%             fprintf( fid, 'Fix drift.\n\n' );
+%             fprintf( fid, './MakeStabilizeJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+%             fprintf( fid, '%s/Processing/stabilizejobs/commands.sh\n\n', FullPathSetsOnAnalysisBox);
+%             
+%             fclose(fid);
+%             
+%             
+%             
+%             
+%             %make initial xml
+%             ImageSize = [Scp.Width Scp.Height];
+%             
+%             xmlFileName = fullfile(Scp.MD.pth,'Processing','dataset.xml');
+%             fid = fopen( xmlFileName, 'wt' );
+%             fprintf( fid, '%s\n', '<?xml version="1.0" encoding="UTF-8"?>');
+%             fprintf( fid, '%s\n', '<SpimData version="0.2">');
+%             fprintf( fid, '%s\n', '  <BasePath type="relative">.</BasePath>');
+%             fprintf( fid, '%s\n', '  <SequenceDescription>');
+%             fprintf( fid, '%s\n', '    <ImageLoader format="spimreconstruction.filelist">');
+%             fprintf( fid, '%s\n', '      <imglib2container>ArrayImgFactory</imglib2container>');
+%             fprintf( fid, '%s\n', '      <ZGrouped>false</ZGrouped>');
+%             fprintf( fid, '%s\n', '      <files>');
+%             
+%             
+%             
+%             Tiles = Scp.MD.unique('Tile');
+%             Tiles = sort(str2double(Tiles));
+%             Channels = Scp.MD.unique('Channel');
+%             frames = Scp.MD.unique('frame');
+%             for indFrame = 1:numel(frames)
+%                 for indCh=1:numel(Channels)
+%                     for indTile=1:numel(Tiles)
+%                         filename = Scp.MD.getImageFilenameRelative({'frame', 'Channel', 'Tile'},{frames(indFrame),Channels(indCh),num2str(Tiles(indTile))});
+%                         filename = strrep(filename,'\','/');
+%                         viewsetup = (indCh-1)*numel(Tiles)+indTile-1;
+%                         fprintf( fid, '%s%d%s%d%s\n', '        <FileMapping view_setup="',viewsetup,'" timepoint="',frames(indFrame)-1,'" series="0" channel="0">');
+%                         fprintf( fid, '%s%s%s\n', '          <file type="relative">../',filename,'</file>');
+%                         fprintf( fid, '%s\n', '        </FileMapping>');
+%                     end
+%                 end
+%             end
+%             fprintf( fid, '%s\n', '      </files>');
+%             fprintf( fid, '%s\n', '    </ImageLoader>');
+%             fprintf( fid, '%s\n', '    <ViewSetups>');
+%             
+%             angles = [];
+%             dZratio = Scp.MD.unique('dz')./Scp.MD.unique('PixelSize');
+%             nZs = Scp.MD.getSpecificMetadata('nFrames','frame',1,'sortby','Channel');
+%             Positions = Scp.MD.getSpecificMetadata('Position','frame',1,'sortby','Channel');
+%             
+%             for indCh=1:numel(Channels)
+%                 for indTile=1:numel(Tiles)
+%                     viewsetup = (indCh-1)*numel(Tiles)+indTile-1;
+%                     nZ = nZs{viewsetup+1};
+%                     Position = Positions{viewsetup+1};
+%                     ptrn='Theta';
+%                     wherestheta = regexp(Position,ptrn);
+%                     angle = str2double(Position(wherestheta+length(ptrn):wherestheta+length(ptrn)+2));
+%                     angles = [angles angle];
+%                     fprintf( fid, '%s\n', '      <ViewSetup>');
+%                     fprintf( fid, '%s%d%s\n', '        <id>',viewsetup,'</id>');
+%                     fprintf( fid, '%s%d%s\n', '        <name>',viewsetup,'</name>');
+%                     fprintf( fid, '%s%d %d %d%s\n', '        <size>',ImageSize(1),ImageSize(2) ,nZ,'</size>');
+%                     fprintf( fid, '%s\n', '        <voxelSize>');
+%                     fprintf( fid, '%s\n', '          <unit>pixels</unit>');
+%                     fprintf( fid, '%s%.1f %.1f %.2f%s\n', '          <size>',1,1,dZratio,'</size>');
+%                     fprintf( fid, '%s\n', '        </voxelSize>');
+%                     fprintf( fid, '%s\n', '        <attributes>');
+%                     fprintf( fid, '%s\n', '          <illumination>0</illumination>');
+%                     fprintf( fid, '%s%d%s\n', '          <channel>',indCh,'</channel>');
+%                     fprintf( fid, '%s%d%s\n', '          <tile>',indTile-1,'</tile>');
+%                     fprintf( fid, '%s%.0f%s\n', '          <angle>',angle,'</angle>');
+%                     fprintf( fid, '%s\n', '        </attributes>');
+%                     fprintf( fid, '%s\n', '      </ViewSetup>');
+%                     
+%                 end
+%             end
+%             angles = unique(angles);
+%             
+%             fprintf( fid, '%s\n', '      <Attributes name="illumination">');
+%             fprintf( fid, '%s\n', '        <Illumination>');
+%             fprintf( fid, '%s\n', '          <id>0</id>');
+%             fprintf( fid, '%s\n', '          <name>0</name>');
+%             fprintf( fid, '%s\n', '        </Illumination>');
+%             fprintf( fid, '%s\n', '      </Attributes>');
+%             
+%             
+%             fprintf( fid, '%s\n', '      <Attributes name="channel">');
+%             for indCh=1:numel(Channels)
+%                 fprintf( fid, '%s\n', '        <Channel>');
+%                 fprintf( fid, '%s%d%s\n', '          <id>',indCh,'</id>');
+%                 fprintf( fid, '%s%d%s\n', '          <name>',indCh,'</name>');
+%                 fprintf( fid, '%s\n', '        </Channel>');
+%             end
+%             fprintf( fid, '%s\n', '      </Attributes>');
+%             
+%             fprintf( fid, '%s\n', '      <Attributes name="tile">');
+%             for indTile=1:numel(Tiles)
+%                 fprintf( fid, '%s\n', '        <Tile>');
+%                 fprintf( fid, '%s%d%s\n', '          <id>',indTile-1,'</id>');
+%                 fprintf( fid, '%s%d%s\n', '          <name>',indTile-1,'</name>');
+%                 fprintf( fid, '%s\n', '        </Tile>');
+%             end
+%             fprintf( fid, '%s\n', '      </Attributes>');
+%             
+%             fprintf( fid, '%s\n', '      <Attributes name="angle">');
+%             for i=1:numel(angles)
+%                 fprintf( fid, '%s\n', '        <Angle>');
+%                 fprintf( fid, '%s%d%s\n', '          <id>',angles(i),'</id>');
+%                 fprintf( fid, '%s%d%s\n', '          <name>',angles(i),'</name>');
+%                 fprintf( fid, '%s\n', '        </Angle>');
+%             end
+%             fprintf( fid, '%s\n', '      </Attributes>');
+%             fprintf( fid, '%s\n', '    </ViewSetups>');
+%             fprintf( fid, '%s\n', '    <Timepoints type="range">');
+%             fprintf( fid, '%s%d%s\n', '      <first>',min(frames)-1,'</first>');
+%             fprintf( fid, '%s%d%s\n', '      <last>',max(frames)-1,'</last>');
+%             fprintf( fid, '%s\n', '    </Timepoints>');
+%             
+%             fprintf( fid, '%s\n', '    <MissingViews />');
+%             fprintf( fid, '%s\n', '  </SequenceDescription>');
+%             
+%             
+%             
+%             fprintf( fid, '%s\n', '  <ViewRegistrations>');
+%             for indFrame = 1:numel(frames)
+%                 for indCh=1:numel(Channels)
+%                     for indTile=1:numel(Tiles)
+%                         viewsetup = (indCh-1)*numel(Tiles)+indTile-1;
+%                         fprintf( fid, '%s%d%s%d%s\n', '    <ViewRegistration timepoint="',frames(indFrame)-1,'" setup="',viewsetup,'">');
+%                         fprintf( fid, '%s\n', '      <ViewTransform type="affine">');
+%                         fprintf( fid, '%s\n', '        <Name>calibration</Name>');
+%                         fprintf( fid, '%s %.2f %s\n', '        <affine>1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0',dZratio,'0.0</affine>');
+%                         fprintf( fid, '%s\n', '      </ViewTransform>');
+%                         fprintf( fid, '%s\n', '    </ViewRegistration>');
+%                     end
+%                 end
+%             end
+%             fprintf( fid, '%s\n', '  </ViewRegistrations>');
+%             fprintf( fid, '%s\n', '  <ViewInterestPoints />');
+%             fprintf( fid, '%s\n', '  <BoundingBoxes />');
+%             fprintf( fid, '%s\n', '  <PointSpreadFunctions />');
+%             fprintf( fid, '%s\n', '  <StitchingResults />');
+%             fprintf( fid, '%s\n', '  <IntensityAdjustments />');
+%             fprintf( fid, '%s\n', '</SpimData>');
+%             
+%             
+%             
+%             fclose(fid);
+%             
+%             
+%             
+%         end
+%         
+%         
+%         
+%         
+        
+        
+        
+        
+        function prepareProcessingFilesBefore(Scp, AcqData)
             
             procDirName = [Scp.MD.pth '/Processing'];
             if ~isdir(procDirName)
@@ -537,6 +933,7 @@ classdef RazorScope < Scope
             fprintf( fid, '%s\n', 'xmljobs_export="/Processing/xmljobs"');
             fprintf( fid, '%s\n', 'hdf5jobs_export="/Processing/hdf5jobs"');
             fprintf( fid, '%s\n', 'shiftjobs_export="/Processing/shiftjobs"');
+            fprintf( fid, '%s\n', 'optjobs_export="/Processing/optjobs"');
             fprintf( fid, '%s\n', 'beadsjobs_export="/Processing/beadsjobs"');
             fprintf( fid, '%s\n', 'ICPjobs_export="/Processing/ICPjobs"');
             fprintf( fid, '%s\n', 'Multiviewjobs_export="/Processing/multiviewjobs"');
@@ -549,10 +946,23 @@ classdef RazorScope < Scope
             pth = strrep(pth,'\','/');
             fprintf( fid, 'pth="%s"\n\n', pth);
             
-            nTimePoint = numel(Scp.MD.unique('frame'));
-            nChannels = numel(Scp.MD.unique('Channel'));
-            nTiles = numel(Scp.MD.unique('Tile'));
-            nAngles = numel(Scp.MD.unique('group'));
+            if isa(Scp.Tpnts,'Timepoints')
+                nTimePoint = Scp.Tpnts.num;
+            else
+                nTimePoint=1;
+            end
+            
+            nChannels = numel(AcqData);
+            nTiles = Scp.Pos.N;
+            nAngles = numel(unique(Scp.Pos.Group));
+            
+            unqPos = unique(Scp.Pos.Group);         
+            fixPos = 0;
+            for i=1:numel(unqPos)-1
+                fixPos = [fixPos sum(strcmp(unqPos{i},Scp.Pos.Group))];
+            end
+            fixPos = mat2str(fliplr(fixPos));
+            fixPos = fixPos(2:end-1);
             nPos = 1;
             
             fprintf( fid, 'timepoints="%d"\n',nTimePoint );
@@ -560,48 +970,275 @@ classdef RazorScope < Scope
             fprintf( fid, 'tiles="%d"\n', nTiles);
             fprintf( fid, 'angles="%d"\n', nAngles);
             fprintf( fid, 'pos="%d"\n\n', nPos);
+            fprintf( fid, 'fixPos="%s"\n\n', fixPos);
             
-            zAspect = Scp.MD.unique('dz')./Scp.MD.unique('PixelSize');
+            zAspect = unique(Scp.Pos.ExperimentMetadata(1).dz)./Scp.PixelSize;
             fprintf( fid, 'zAspect="%.2f"\n', zAspect);
             fclose(fid);
             
+            
+          
+            
+            
+           %make steps file 
+            %procDirName = [Scp.MD.pth '/Processing'];
+            %if ~isdir(procDirName)
+            %    mkdir(procDirName);
+            %end
+            
+            pth = Scp.MD.pth;
+            pth = pth(strfind(Scp.MD.pth,Scp.Username)-1:end);
+            pth = strrep(pth,'\','/')
+            
+%            nChannels = numel(Scp.MD.unique('Channel'));
+            nChannels =     numel(AcqData);
+      
+            repoDir = '/home/wollmanlab/Documents/Repos/bigstitchparallel';
+            FullPathOnAnalysisBox = ['/RazorScopeData/RazorScopeImages' pth];
+            FullPathSetsOnAnalysisBox = ['/RazorScopeData/RazorScopeSets' pth];
+            MasterFileNameOnAnalysisBox = [FullPathOnAnalysisBox '/Processing/master'];
+            
+            stepsFileName = fullfile(procDirName,'steps');
+            fid = fopen(stepsFileName, 'wt' );
+            
+            fprintf( fid, 'Open terminal window and run:\n\n');
+            fprintf( fid, 'cd "%s"\n\n', repoDir);
+            %fprintf( fid, './MakeXMLDatasetJobSets.sh "%s"\n', MasterFileNameOnAnalysisBox);
+            %fprintf( fid, '%s/Processing/xmljobs/DefineXML.job\n\n', FullPathOnAnalysisBox);
+            %fprintf( fid, 'This will take some time, so go rest and do some productive things.\n\n');
+            %fprintf( fid, 'Next, run:\n\n');
+            fprintf( fid, './MakeHDFExportJobsSets.sh "%s"\n', MasterFileNameOnAnalysisBox);
+            fprintf( fid, 'parallel --memfree -24G --load 90%% --delay 10 -j16 --retry-failed < %s/Processing/hdf5jobs/commands.txt\n\n', FullPathOnAnalysisBox);
+            fprintf( fid, 'This will take some time, so go rest and do some productive things.\n\n');
+            fprintf( fid, 'Once this is done, the dataset is now saved in HDF5 format.\n\n\nOpen the set using BigStitcher to make sure everything is fine and delete the Tiffs. Time to start aligning!\n\n' );
+            %     fprintf( fid, 'First, we need to move the tiles to their location from the Tile Configuration File.\nUnfortunately this hasn`t been implemented in batch mode yet. Open BigStitcher and load the dataset.\nRight-click on any stack and select `Arrange Views-->Read Locations From File` etc. \n' );
+            
+            fprintf( fid, 'First, we need to move the tiles to their location from the Tile Configuration File.\n');
+            fprintf( fid, 'cd "%s"\n\n', repoDir);
+            
+            fprintf( fid, './MakeLoadConfig.sh "%s"\n', MasterFileNameOnAnalysisBox);
+            fprintf( fid, '%s/Processing/LoadTileConfig.job\n\n', FullPathSetsOnAnalysisBox);
+            fprintf( fid, 'Next, we calculate the shifts between tiles using cross-correlation.\n');
+
+            fprintf( fid, './MakeCalculateShiftJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+            fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j8 --retry-failed < %s/Processing/shiftjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
+            
+            fprintf( fid, 'Filter links and apply shifts using global optimization.\n');
+
+            fprintf( fid, './MakeFilterAndOptimizeJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+            fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j8 --retry-failed < %s/Processing/shiftjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
+                      
+            
+            fprintf( fid, 'Merge the files created by different processes.\n');
+
+            fprintf( fid, '%s/Processing/MergeXMLs.sh\n\n', FullPathSetsOnAnalysisBox);
+
+            fprintf( fid, 'Find interest points for the next steps.\n');
+            
+            fprintf( fid, './MakeFindPointsJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+            fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j12 --retry-failed < %s/Processing/beadsjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
+            fprintf( fid, '%s/Processing/MergeXMLs.sh\n', FullPathSetsOnAnalysisBox);
+            %fprintf( fid, '%s/Processing/beadsjobs/commands.sh\n\n', FullPathSetsOnAnalysisBox);
+            
+             if nChannels>1 %ICP refinement for chromatic aberations
+                fprintf( fid, 'Since we have more than 1 channel, we want to fix some "chromatic aberations".\n\n');
+                fprintf( fid, 'cd "%s"\n', repoDir);
+                fprintf( fid, './MakeICPJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+%                fprintf( fid, '%s/Processing/ICPjobs/commands.sh\n\n', FullPathSetsOnAnalysisBox);
+                fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j16 --retry-failed < %s/Processing/ICPjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
+                fprintf( fid, '%s/Processing/MergeXMLs.sh\n', FullPathSetsOnAnalysisBox);
+             end      
+            
+            
+            fprintf( fid, 'At this point, we`ve finished stitching all the tiles together. We still need to stitch the different angles.\n' );
+            fprintf( fid, 'Open Fiji and open the set with BigStitcher. Make sure that tile registration looks ok.\n' );
+            fprintf( fid, 'Now, align the first timepoint using the BDV GUI. Make sure everything looks right.\n' );
+            fprintf( fid, 'save and close Fiji.\n\n' );
+            fprintf( fid, 'We align iteratively by inhereting all the previous transformations.\n\n' );
+            fprintf( fid, 'cd "%s"\n', repoDir);
+            fprintf( fid, './MakeMultiviewPropJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+            fprintf( fid, '%s/Processing/multiviewjobs/MultiviewProp.job\n\n', FullPathSetsOnAnalysisBox);
+            
 
             
-%             MasterFileNameOnAnalysisBox = ['/RazorScopeData/RazorScopeImages/' pth '/Processing/master'];
-%             
-%             %prepare list of commmands to run
-%             stepsFileName = fullfile(procDirName,'steps');
-%             fid = fopen(stepsFileName, 'wt' );
-%             fprintf( fid, 'This is a description of the steps needed for SPIM analysis.\n\n\n' );
-%             fprintf( fid, 'Open terminal window and cd to the processing folder within the experiment.\n\n' );
-%             fprintf( fid, 'run ./MakeXMLDatasetJobSets.sh .\n\n' );
-%             fprintf( fid, 'run ./MakeHDFExportJobsSets.sh .\n\n' );
-%             fprintf( fid, 'cd into ./xmljobs .\n\n' );
-%             fprintf( fid, 'run ./DefineXML.job . This will take some time, so go rest and do some other things.\n\n' );
-%             fprintf( fid, 'once done, cd ../hdf5jobs .\n\n' );
-%             fprintf( fid, 'remove the old log file: rm /tmp/log .\n\n' );
-%             fprintf( fid, 'run parallel --memfree 24G --delay 15 --retry-failed --joblog /tmp/log < commands.txt .\n\n' );
-%             fprintf( fid, 'This to will take some time, so go rest and do some other things.\n\n' );
-%             fprintf( fid, 'Once this is done, the dataset is now saved in HDF5 format.\n Open the set using BigStitcher to make sure everything is fine and delete the Tiffs. Time to start aligning.\n\n\n' );
-%             fprintf( fid, 'First, we need to move the tiles to their location from TileConfiguration. Unfortunately this hasn`t been implemented in batch mode yet. Open BigStitcher and load the dataset. Right-click on any stack and select `Arrange Views-->Read Locations From File` etc. \n\n' );
-%             fprintf( fid, 'save and close Fiji.\n\n' );
-%             fprintf( fid, 'Open terminal, cd to the dataset under .../RazorScopeSets/... .\n\n' );
-%             fprintf( fid, 'run ./MakeCalculateShiftJobs.sh .\n\n' );
-%             fprintf( fid, 'run ./MakeFindPoinsJobs.sh .\n\n' );
-%             fprintf( fid, 'cd into ./shiftjobs .\n\n' );
-%             fprintf( fid, 'remove the old log file: rm /tmp/log .\n\n' );
-%             fprintf( fid, 'run parallel -j1 --retry-failed --joblog /tmp/log < commands.txt .\n\n' );
-%             fprintf( fid, 'This will, again (!) take some time, so go rest and do some other things.\n\n' );
-%             fprintf( fid, 'once done, cd ../beadsjobs .\n\n' );
-%             fprintf( fid, 'run ./findPoints.job  ./n' );
-% 
-% 
-%             
-%             
-% 
-%             fclose(fid);
-
+            fprintf( fid, 'Fix drift.\n\n' );
+            fprintf( fid, './MakeStabilizeJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+            fprintf( fid, '%s/Processing/stabilizejobs/commands.sh\n\n', FullPathSetsOnAnalysisBox);
+            
+            fclose(fid);
+            
+            
+            
+            
+            %make initial xml
+            ImageSize = [Scp.Width Scp.Height];
+            xmlFileName = fullfile(procDirName,'dataset.xml');
+            fid = fopen( xmlFileName, 'wt' );
+            
+            filesToJobsDictionary = fullfile(procDirName,'filesToJobsDictionary.txt');
+            fidFTJ = fopen( filesToJobsDictionary, 'wt' );
+            
+            
+            fprintf( fid, '%s\n', '<?xml version="1.0" encoding="UTF-8"?>');
+            fprintf( fid, '%s\n', '<SpimData version="0.2">');
+            fprintf( fid, '%s\n', '  <BasePath type="relative">.</BasePath>');
+            fprintf( fid, '%s\n', '  <SequenceDescription>');
+            fprintf( fid, '%s\n', '    <ImageLoader format="spimreconstruction.filelist">');
+            fprintf( fid, '%s\n', '      <imglib2container>ArrayImgFactory</imglib2container>');
+            fprintf( fid, '%s\n', '      <ZGrouped>false</ZGrouped>');
+            fprintf( fid, '%s\n', '      <files>');
+            
+            
+            
+            %Tiles = Scp.MD.unique('Tile');
+            %Tiles = sort(str2double(Tiles));
+            Tiles = 0:Scp.Pos.N-1;
+            %Channels = Scp.MD.unique('Channel');
+            Channels = {AcqData.Channel}';
+            %frames = Scp.MD.unique('frame');
+            if isa(Scp.Tpnts,'Timepoints')
+                frames = 1:Scp.Tpnts.N;
+            else
+                frames=1;
             end
+            counter=1;
+            for indFrame = 1:numel(frames)
+                for indCh=1:numel(Channels)
+                    for indTile=1:numel(Tiles)
+                        
+                        filename = sprintf('img_%s_%03g_Ch%d_000.tif',Scp.Pos.Labels{indTile},indFrame-1,indCh);
+                        fprintf(fidFTJ, '%d\t%s\n' ,counter,filename(1:end-4));
+
+                        filename = [filename(1:end-4) '/MMStack.ome.tif'];                      
+                        %filename = Scp.MD.getImageFilenameRelative({'frame', 'Channel', 'Tile'},{frames(indFrame),Channels(indCh),num2str(Tiles(indTile))});
+                        filename = strrep(filename,'\','/');
+                        counter = counter+1;
+                        viewsetup = (indCh-1)*numel(Tiles)+indTile-1;
+                        fprintf( fid, '%s%d%s%d%s\n', '        <FileMapping view_setup="',viewsetup,'" timepoint="',frames(indFrame)-1,'" series="0" channel="0">');
+                        fprintf( fid, '%s%s%s\n', '          <file type="relative">../',filename,'</file>');
+                        fprintf( fid, '%s\n', '        </FileMapping>');
+                    end
+                end
+            end
+            fprintf( fid, '%s\n', '      </files>');
+            fprintf( fid, '%s\n', '    </ImageLoader>');
+            fprintf( fid, '%s\n', '    <ViewSetups>');
+            
+            fclose(fidFTJ);
+            
+            angles = [];
+            dZratio = unique(Scp.Pos.ExperimentMetadata(1).dz)./Scp.PixelSize;
+           %nZs = Scp.MD.getSpecificMetadata('nFrames','frame',1,'sortby','Channel');
+            
+            nZs = {Scp.Pos.ExperimentMetadata.nFrames}';
+            %Positions = Scp.MD.getSpecificMetadata('Position','frame',1,'sortby','Channel');
+            Positions = Scp.Pos.Labels';
+            for indCh=1:numel(Channels)
+                for indTile=1:numel(Tiles)
+                    viewsetup = (indCh-1)*numel(Tiles)+indTile-1;
+                    nZ = nZs{indTile};
+                    Position = Positions{indTile};
+                    ptrn='Theta';
+                    wherestheta = regexp(Position,ptrn);
+                    angle = str2double(Position(wherestheta+length(ptrn):wherestheta+length(ptrn)+2));
+                    angles = [angles angle];
+                    fprintf( fid, '%s\n', '      <ViewSetup>');
+                    fprintf( fid, '%s%d%s\n', '        <id>',viewsetup,'</id>');
+                    fprintf( fid, '%s%d%s\n', '        <name>',viewsetup,'</name>');
+                    fprintf( fid, '%s%d %d %d%s\n', '        <size>',ImageSize(1),ImageSize(2) ,nZ,'</size>');
+                    fprintf( fid, '%s\n', '        <voxelSize>');
+                    fprintf( fid, '%s\n', '          <unit>pixels</unit>');
+                    fprintf( fid, '%s%.1f %.1f %.2f%s\n', '          <size>',1,1,dZratio,'</size>');
+                    fprintf( fid, '%s\n', '        </voxelSize>');
+                    fprintf( fid, '%s\n', '        <attributes>');
+                    fprintf( fid, '%s\n', '          <illumination>0</illumination>');
+                    fprintf( fid, '%s%d%s\n', '          <channel>',indCh,'</channel>');
+                    fprintf( fid, '%s%d%s\n', '          <tile>',indTile-1,'</tile>');
+                    fprintf( fid, '%s%.0f%s\n', '          <angle>',angle,'</angle>');
+                    fprintf( fid, '%s\n', '        </attributes>');
+                    fprintf( fid, '%s\n', '      </ViewSetup>');
+                    
+                end
+            end
+            angles = unique(angles);
+            
+            fprintf( fid, '%s\n', '      <Attributes name="illumination">');
+            fprintf( fid, '%s\n', '        <Illumination>');
+            fprintf( fid, '%s\n', '          <id>0</id>');
+            fprintf( fid, '%s\n', '          <name>0</name>');
+            fprintf( fid, '%s\n', '        </Illumination>');
+            fprintf( fid, '%s\n', '      </Attributes>');
+            
+            
+            fprintf( fid, '%s\n', '      <Attributes name="channel">');
+            for indCh=1:numel(Channels)
+                fprintf( fid, '%s\n', '        <Channel>');
+                fprintf( fid, '%s%d%s\n', '          <id>',indCh,'</id>');
+                fprintf( fid, '%s%d%s\n', '          <name>',indCh,'</name>');
+                fprintf( fid, '%s\n', '        </Channel>');
+            end
+            fprintf( fid, '%s\n', '      </Attributes>');
+            
+            fprintf( fid, '%s\n', '      <Attributes name="tile">');
+            for indTile=1:numel(Tiles)
+                fprintf( fid, '%s\n', '        <Tile>');
+                fprintf( fid, '%s%d%s\n', '          <id>',indTile-1,'</id>');
+                fprintf( fid, '%s%d%s\n', '          <name>',indTile-1,'</name>');
+                fprintf( fid, '%s\n', '        </Tile>');
+            end
+            fprintf( fid, '%s\n', '      </Attributes>');
+            
+            fprintf( fid, '%s\n', '      <Attributes name="angle">');
+            for i=1:numel(angles)
+                fprintf( fid, '%s\n', '        <Angle>');
+                fprintf( fid, '%s%d%s\n', '          <id>',angles(i),'</id>');
+                fprintf( fid, '%s%d%s\n', '          <name>',angles(i),'</name>');
+                fprintf( fid, '%s\n', '        </Angle>');
+            end
+            fprintf( fid, '%s\n', '      </Attributes>');
+            fprintf( fid, '%s\n', '    </ViewSetups>');
+            fprintf( fid, '%s\n', '    <Timepoints type="range">');
+            fprintf( fid, '%s%d%s\n', '      <first>',min(frames)-1,'</first>');
+            fprintf( fid, '%s%d%s\n', '      <last>',max(frames)-1,'</last>');
+            fprintf( fid, '%s\n', '    </Timepoints>');
+            
+            fprintf( fid, '%s\n', '    <MissingViews />');
+            fprintf( fid, '%s\n', '  </SequenceDescription>');
+            
+            
+            
+            fprintf( fid, '%s\n', '  <ViewRegistrations>');
+            for indFrame = 1:numel(frames)
+                for indCh=1:numel(Channels)
+                    for indTile=1:numel(Tiles)
+                        viewsetup = (indCh-1)*numel(Tiles)+indTile-1;
+                        fprintf( fid, '%s%d%s%d%s\n', '    <ViewRegistration timepoint="',frames(indFrame)-1,'" setup="',viewsetup,'">');
+                        fprintf( fid, '%s\n', '      <ViewTransform type="affine">');
+                        fprintf( fid, '%s\n', '        <Name>calibration</Name>');
+                        fprintf( fid, '%s %.2f %s\n', '        <affine>1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0',dZratio,'0.0</affine>');
+                        fprintf( fid, '%s\n', '      </ViewTransform>');
+                        fprintf( fid, '%s\n', '    </ViewRegistration>');
+                    end
+                end
+            end
+            fprintf( fid, '%s\n', '  </ViewRegistrations>');
+            fprintf( fid, '%s\n', '  <ViewInterestPoints />');
+            fprintf( fid, '%s\n', '  <BoundingBoxes />');
+            fprintf( fid, '%s\n', '  <PointSpreadFunctions />');
+            fprintf( fid, '%s\n', '  <StitchingResults />');
+            fprintf( fid, '%s\n', '  <IntensityAdjustments />');
+            fprintf( fid, '%s\n', '</SpimData>');
+            
+            
+            
+            fclose(fid);
+            
+            
+            
+        end
+        
+        
+        
     end
     
 end

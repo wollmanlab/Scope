@@ -301,7 +301,7 @@ classdef (Abstract) Scope < handle
                     filename2ds = fullfile(acqname,filename); 
                     NFrames = Scp.Pos.ExperimentMetadata(Scp.Pos.current).nFrames;
                     dz = Scp.Pos.ExperimentMetadata(Scp.Pos.current).dz;
-                    Scp.ZStage.Velocity = 8;
+                    Scp.ZStage.Velocity = Scp.imagingVelocity;%Scp.imagingVelocity;
                     Scp.ZStage.moveWithDelay(dz*NFrames);
                     tic;
                     Scp.snapSeqDatastore(Scp.pth,filename2ds,NFrames)
@@ -388,7 +388,7 @@ classdef (Abstract) Scope < handle
         %% snapSeq using datastore on the SSD
         function snapSeqDatastore(Scp,pth,filename,NFrames)
             store = Scp.studio.data().createMultipageTIFFDatastore([pth filesep filename],false,false);
-            Scp.studio.displays().manage(store);
+            %Scp.studio.displays().manage(store);
             %Scp.studio.displays().createDisplay(store);
             builder = Scp.studio.data().getCoordsBuilder().z(0).channel(0).stagePosition(0);
             curFrame = 0;
@@ -405,8 +405,16 @@ classdef (Abstract) Scope < handle
                     clear timg;
                     Scp.mmc.getRemainingImageCount();
                 else
-                    Scp.mmc.sleep(min(0.5*Scp.Exposure,5));
+                    Scp.mmc.sleep(min(Scp.Exposure,10));
                 end
+            end
+            
+            while store.getNumImages<NFrames %fix annoying -1 problem - AOY
+                timg = Scp.mmc.getTaggedImage;
+                curFrame=curFrame+1;
+                img = Scp.studio.data().convertTaggedImage(timg, builder.time(curFrame).build(),'');
+                store.putImage(img);
+                clear timg;
             end
             
             Scp.mmc.stopSequenceAcquisition();
@@ -579,6 +587,11 @@ classdef (Abstract) Scope < handle
                 acqname = arg.acqname;
             end
             
+            
+            if Scp.Strobbing
+                Scp.prepareProcessingFilesBefore(AcqData);
+            end
+            
             %% Add channel sequence to trigger device (if any)
             Scp.setTriggerChannelSequence(AcqData);
             
@@ -629,7 +642,7 @@ classdef (Abstract) Scope < handle
                 Scp.MD.saveMetadata(fullfile(Scp.pth,acqname));
             end
             
-            
+            disp('I`m done now. Thank you.')
         end
         
         function logError(Scp,msg,varargin)
