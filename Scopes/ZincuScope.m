@@ -20,6 +20,45 @@ classdef ZincuScope < Scope
             Mag=Mag*0.63;
         end
         
+        function goto(Scp,label,Pos,varargin)
+            arg.plot = true;
+            arg.single = true;
+            arg.feature='';
+            arg = parseVarargin(varargin,arg);
+            
+            if nargin==2 || isempty(Pos) % no position list provided
+                Pos  = Scp.createPositions('tmp',true,'prefix','');
+                single = arg.single;
+            else
+                if ~isa(Pos,'Positions')
+                    Pos = Scp.Pos;
+                end
+                single = false;
+            end
+             err = goto@Scope(Scp,label,Pos,varargin);
+%             if err
+%                 warning('resetting stage')
+%                 Scp.mmc.setProperty('Focus','Load Position',1);
+%                 
+%                 Scp.mmc.setSerialPortCommand('COM1', 'REMRES', '\r');
+%                 pause(15)
+%                 Scp.mmc.setProperty('XYStage','Speed',20000);
+%                 Scp.mmc.setProperty('XYStage','Acceleration',2);
+%                 Scp.mmc.setSerialPortCommand('COM1', 'HOME X', '\r');
+%                 Scp.X;
+%                 pause(5)
+%                 
+%                 Scp.mmc.setSerialPortCommand('COM1', 'HOME Y', '\r');
+%                 Scp.Y;
+%                 pause(5)
+%                 Scp.Chamber.x0y0 = Scp.XY+[13326       10550];
+%                 Scp.Chamber.directionXY = [1 1];
+%                 
+%                 Scp.goto(label,Pos,varargin)
+%                 Scp.mmc.setProperty('Focus','Load Position',0);
+% 
+%             end
+        end
         
         
         function setObjective(Scp,Objective)
@@ -101,7 +140,11 @@ classdef ZincuScope < Scope
                     warning('There`s no hardware AF here, yet.');
                     %Scp.studio.autofocusNow();
                 case 'software'
-                    z = Scp.ImageBasedFocusHillClimb('channel',AcqData.Channel,'exposure',AcqData.Exposure);
+                    if isa(Scp.Mishor,'MishorAutofocus')
+                        zPred = Scp.Mishor.Zpredict(Scp.XY);
+                        Scp.Z = zPred;
+                    end
+                    z = Scp.ImageBasedFocusHillClimb;
                     Scp.Z=z;
                 otherwise
                     error('Please define type of autofocus (as None if none exist)')
@@ -109,6 +152,29 @@ classdef ZincuScope < Scope
             
         end
    
+        function ZDriveGUI(Scp)
+            %%
+            figure(468)
+            clf;
+            set(468,'position',[400 600 50 300],'color','w','toolbar','none','dockcontrol','off','menubar','none','Name','Z','NumberTitle','off');
+            sliderpos=str2double(Scp.mmc.getProperty('Focus','Position'));
+            h = uicontrol(468,'Style','slider','Min',-9000,'Max',1000,'Units','normalized','String','Z','Value',sliderpos,'Position',[0.35 0 0.65 1],'SliderStep',[0.0005 0.005]);
+            addlistener(h,'Value','PostSet',@slidercallback);
+            h.BackgroundColor='w'; 
+            
+            %gui updater
+            T = timer('Period',1,'StartDelay',0,'TimerFcn',@(src,evt)set(h,'Value',str2double(Scp.mmc.getProperty('Focus','Position'))),...
+             'ExecutionMode','FixedRate');
+            start(T)
+            
+            
+            annotation('textbox', [0, 0.6, 0, 0], 'string', 'Z')
+            function slidercallback(~,~)
+                sliderpos = get(h,'Value');
+                Scp.mmc.setProperty('Focus','Position',num2str(sliderpos))
+            end
+
+        end
         
     end
 end
