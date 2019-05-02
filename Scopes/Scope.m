@@ -2084,7 +2084,7 @@ classdef (Abstract) Scope < handle
             uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
             uiwait(445)
             Scp.Pos.List(:,3) = Scp.Z;
-            ManualZ = Scp.Z;
+            %ManualZ = Scp.Z;
             for i=1:Scp.Pos.N
                 Scp.goto(Scp.Pos.Labels{i}, Scp.Pos)
                 Zfocus = Scp.ImageBasedFocusHillClimb(varargin{:});
