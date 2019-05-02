@@ -1958,7 +1958,7 @@ classdef (Abstract) Scope < handle
             clf
             
             Zinit = Scp.Z;
-            dZ = 35;
+            dZ = 35*(6.3/Scp.Optovar)^2;
             sgn = 1;
 
             acc = dZ^(1/5);
@@ -2083,8 +2083,10 @@ classdef (Abstract) Scope < handle
             set(445,'Windowstyle','normal','toolbar','none','menubar','none','Position',[700 892 300 75],'Name','Please find focus in first well','NumberTitle','off')
             uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
             uiwait(445)
-            Scp.Pos.List(:,3) = Scp.Z;
-            %ManualZ = Scp.Z;
+
+            dZ1 = Scp.Z-Scp.Mishor.Zpredict(Scp.XY);
+            Scp.Pos.List(:,3) = Scp.Mishor.Zpredict(Scp.Pos.List(:,1:2))+dZ1;
+            ManualZ = Scp.Z;
             for i=1:Scp.Pos.N
                 Scp.goto(Scp.Pos.Labels{i}, Scp.Pos)
                 Zfocus = Scp.ImageBasedFocusHillClimb(varargin{:});
