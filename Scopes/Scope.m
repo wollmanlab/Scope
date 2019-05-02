@@ -303,7 +303,7 @@ classdef (Abstract) Scope < handle
                     filename2ds = fullfile(acqname,filename); 
                     NFrames = Scp.Pos.ExperimentMetadata(Scp.Pos.current).nFrames;
                     dz = Scp.Pos.ExperimentMetadata(Scp.Pos.current).dz;
-                    Scp.ZStage.Velocity = 8;
+                    Scp.ZStage.Velocity = Scp.imagingVelocity;%Scp.imagingVelocity;
                     Scp.ZStage.moveWithDelay(dz*NFrames);
                     tic;
                     Scp.snapSeqDatastore(Scp.pth,filename2ds,NFrames)
@@ -390,7 +390,7 @@ classdef (Abstract) Scope < handle
         %% snapSeq using datastore on the SSD
         function snapSeqDatastore(Scp,pth,filename,NFrames)
             store = Scp.studio.data().createMultipageTIFFDatastore([pth filesep filename],false,false);
-            Scp.studio.displays().manage(store);
+            %Scp.studio.displays().manage(store);
             %Scp.studio.displays().createDisplay(store);
             builder = Scp.studio.data().getCoordsBuilder().z(0).channel(0).stagePosition(0);
             curFrame = 0;
@@ -407,8 +407,16 @@ classdef (Abstract) Scope < handle
                     clear timg;
                     Scp.mmc.getRemainingImageCount();
                 else
-                    Scp.mmc.sleep(min(0.5*Scp.Exposure,5));
+                    Scp.mmc.sleep(min(Scp.Exposure,10));
                 end
+            end
+            
+            while store.getNumImages<NFrames %fix annoying -1 problem - AOY
+                timg = Scp.mmc.getTaggedImage;
+                curFrame=curFrame+1;
+                img = Scp.studio.data().convertTaggedImage(timg, builder.time(curFrame).build(),'');
+                store.putImage(img);
+                clear timg;
             end
             
             Scp.mmc.stopSequenceAcquisition();
@@ -581,6 +589,11 @@ classdef (Abstract) Scope < handle
                 acqname = arg.acqname;
             end
             
+            
+            if Scp.Strobbing
+                Scp.prepareProcessingFilesBefore(AcqData);
+            end
+            
             %% Add channel sequence to trigger device (if any)
             Scp.setTriggerChannelSequence(AcqData);
             
@@ -631,7 +644,7 @@ classdef (Abstract) Scope < handle
                 Scp.MD.saveMetadata(fullfile(Scp.pth,acqname));
             end
             
-            
+            disp('I`m done now. Thank you.')
         end
         
         function logError(Scp,msg,varargin)
@@ -883,7 +896,7 @@ classdef (Abstract) Scope < handle
             lbl = Scp.Chamber.Wells(mi);
         end
         
-        function goto(Scp,label,Pos,varargin)
+        function err = goto(Scp,label,Pos,varargin)
             
             Scp.TimeStamp = 'startmove';
             arg.plot = true;
@@ -936,6 +949,14 @@ classdef (Abstract) Scope < handle
                 plot(Pos,Scp,'fig',Scp.Chamber.Fig.fig,'label',label,'single',single);
             end
             Scp.TimeStamp = 'endmove';
+            ifMulti = regexp(label,'_');
+            if ifMulti
+            label = label(1:ifMulti(1)-1);
+            end
+            err =~strcmp(Scp.whereami,label); %return err=1 if end position doesnt match label
+            if err
+               warning('stage position doesn`t match label') 
+            end
         end
         
         function when = getTimeStamp(Scp,what)
@@ -1229,7 +1250,8 @@ classdef (Abstract) Scope < handle
                 elseif numel(Pos.axis)==2
                     WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY];
                 elseif numel(Pos.axis)==3
-                    WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY, repmat(Scp.Z,numel(Ywell),1)];
+
+                    WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY, repmat(Scp.Z, numel(Xwell),1)];
                 end
                 
                 %% add up to long list
@@ -1917,12 +1939,12 @@ classdef (Abstract) Scope < handle
             %Works really well with Hoescht:
             %Scp.ImageBasedFocusHillClimb('channel','Brightfield','exposure',20,'resize',0.25,'scale',50)
             
-            arg.scale = 2; % if True will acq multiple channels per Z movement.
-            arg.resize =1;
-            arg.channel = 'DeepBlue'; % if True will acq multiple channels per Z movement.
-            arg.exposure =10;
-            % False will acq a Z stack per color.
-            arg = parseVarargin(varargin,arg);
+            arg.scale = ParseInputs('scale',Scp.AFparam.scale,varargin);
+            arg.resize = ParseInputs('resize',Scp.AFparam.resize,varargin);
+            arg.channel = ParseInputs('channel',Scp.AFparam.channel,varargin);
+            arg.exposure = ParseInputs('exposure',Scp.AFparam.exposure,varargin);
+            
+            
             %% Set channels and exposure
             Scp.Channel=arg.channel;
             Scp.Exposure=arg.exposure;
@@ -1938,7 +1960,8 @@ classdef (Abstract) Scope < handle
             Zinit = Scp.Z;
             dZ = 35;
             sgn = 1;
-            acc = 35^(1/5);
+
+            acc = dZ^(1/5);
             cont1=Scp.Contrast('scale',arg.scale,'resize',arg.resize);  %measure of contrast
             Zs = [Zs Scp.Z];
             Conts = [Conts cont1];
@@ -2066,7 +2089,7 @@ classdef (Abstract) Scope < handle
                 Scp.goto(Scp.Pos.Labels{i}, Scp.Pos)
                 Zfocus = Scp.ImageBasedFocusHillClimb(varargin{:});
                 if i==1
-                    dZ = ManualZ-Zfocus;%difference bw what I call focus and what Mr. computer man thinks.
+                    dZ = 0;%ManualZ-Zfocus;%difference bw what I call focus and what Mr. computer man thinks.
                 end
                 Scp.Pos.List(i,3) = Zfocus+dZ;
             end

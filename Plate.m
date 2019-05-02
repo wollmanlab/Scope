@@ -108,7 +108,7 @@ classdef Plate < Chamber
                    P.x0y0 = []; %Has to be determined by Scope stage in ScopeStartup config file
                    %changed Ryan 7/1
                    P.directionXY = [-1 -1];
-                   P.wellSpacingXY = [8800 3000];
+                   P.wellSpacingXY = [-8800 3000];
                    P.Wells = {  'L1S1'    'L2S1'    'L3S1'    'L4S1'    'L5S1'    'L6S1' 
                                 'L1S2'    'L2S2'    'L3S2'    'L4S2'    'L5S2'    'L6S2'
                                 'L1S3'    'L2S3'    'L3S3'    'L4S3'    'L5S3'    'L6S3'

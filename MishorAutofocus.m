@@ -13,6 +13,11 @@ classdef MishorAutofocus < handle
             if numel(wells)<4
                error('Need at least 4 wells for this type of autofocus') 
             end
+            
+            
+            manualFind = ParseInputs('manualFind',false,varargin);
+            
+            
             W.Pos = W.setAutofocusPositions(Scp, wells);
             Scp.goto(W.Pos.Labels{1}, W.Pos)
             figure(445)
@@ -20,7 +25,28 @@ classdef MishorAutofocus < handle
             uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
             uiwait(445)
             W.Pos.List(:,3) = Scp.Z;
-            W.findFocusMarks(Scp, varargin{:})
+
+            
+            if ~manualFind
+                Scp.goto(W.Pos.Labels{1}, W.Pos)
+                figure(445)
+                set(445,'Windowstyle','normal','toolbar','none','menubar','none','Position',[700 892 300 75],'Name','Please find focus in first well','NumberTitle','off')
+                uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
+                uiwait(445)
+                W.Pos.List(:,3) = Scp.Z;
+                W.findFocusMarks(Scp,varargin{:})
+            else
+                for i=1:numel(W.Pos.Labels)
+                    Scp.goto(W.Pos.Labels{i}, W.Pos)
+                    figure(445)
+                    set(445,'Windowstyle','normal','toolbar','none','menubar','none','Position',[700 892 300 75],'Name','Please find focus in first well','NumberTitle','off')
+                    uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
+                    uiwait(445)
+                    W.Pos.List(i,3) = Scp.Z;
+                end
+            end
+            
+            
             dZ = zeros(numel(wells)-3,1);
             for i=4:numel(wells)
                 dZ(i) = abs(W.Pos.List(i,3) - W.zInterp(W.Pos.List(i,1:2)));
