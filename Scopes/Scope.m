@@ -932,7 +932,7 @@ classdef (Abstract) Scope < handle
             end
             
             % update display (unless low overhead is enabled)
-            if ~Scp.reduceAllOverheadForSpeed && arg.plot
+            if arg.plot %Scp.reduceAllOverheadForSpeed &&
                 plot(Pos,Scp,'fig',Scp.Chamber.Fig.fig,'label',label,'single',single);
             end
             Scp.TimeStamp = 'endmove';
@@ -1229,7 +1229,7 @@ classdef (Abstract) Scope < handle
                 elseif numel(Pos.axis)==2
                     WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY];
                 elseif numel(Pos.axis)==3
-                    WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY, Scp.Z];
+                    WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY, repmat(Scp.Z,numel(Ywell),1)];
                 end
                 
                 %% add up to long list
@@ -1936,9 +1936,9 @@ classdef (Abstract) Scope < handle
             clf
             
             Zinit = Scp.Z;
-            dZ = 50;
+            dZ = 35;
             sgn = 1;
-            acc = 50^(1/5);
+            acc = 35^(1/5);
             cont1=Scp.Contrast('scale',arg.scale,'resize',arg.resize);  %measure of contrast
             Zs = [Zs Scp.Z];
             Conts = [Conts cont1];

@@ -9,7 +9,7 @@ classdef MishorAutofocus < handle
     
     methods
         %%
-        function W = MishorAutofocus(Scp,wells)
+        function W = MishorAutofocus(Scp,wells,varargin)
             if numel(wells)<4
                error('Need at least 4 wells for this type of autofocus') 
             end
@@ -20,7 +20,7 @@ classdef MishorAutofocus < handle
             uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
             uiwait(445)
             W.Pos.List(:,3) = Scp.Z;
-            W.findFocusMarks(Scp, 'channel','Brightfield','exposure',40,'resize',0.25,'scale',50)
+            W.findFocusMarks(Scp, varargin{:})
             dZ = zeros(numel(wells)-3,1);
             for i=4:numel(wells)
                 dZ(i) = abs(W.Pos.List(i,3) - W.zInterp(W.Pos.List(i,1:2)));
@@ -35,7 +35,7 @@ classdef MishorAutofocus < handle
         end
         % create autofocus position list
         function Posit = setAutofocusPositions(W,Scp, wells)
-        Posit = Scp.createPositions([],'wells',wells,'axis',{'X','Y','Z'});
+        Posit = Scp.createPositions([],'wells',wells,'axis',{'X','Y','Z'},'tmp',true);
         end
         
         % find the focus plane at the given wells
