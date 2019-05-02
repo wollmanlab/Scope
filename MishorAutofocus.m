@@ -27,11 +27,12 @@ classdef MishorAutofocus < handle
                 uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
                 uiwait(445)
                 W.Pos.List(:,3) = Scp.Z;
+                W.findFocusMarks(Scp,varargin{:})
             else
                 for i=1:numel(W.Pos.Labels)
                     Scp.goto(W.Pos.Labels{i}, W.Pos)
                     figure(445)
-                    set(445,'Windowstyle','normal','toolbar','none','menubar','none','Position',[700 892 300 75],'Name','Please find focus in first well','NumberTitle','off')
+                    set(445,'Windowstyle','normal','toolbar','none','menubar','none','Position',[700 892 300 75],'Name','Please find focus','NumberTitle','off')
                     uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
                     uiwait(445)
                     W.Pos.List(i,3) = Scp.Z;
@@ -39,7 +40,6 @@ classdef MishorAutofocus < handle
             end
             
             
-            W.findFocusMarks(Scp,varargin{:})
             dZ = zeros(numel(wells)-3,1);
             for i=4:numel(wells)
                 dZ(i) = abs(W.Pos.List(i,3) - W.zInterp(W.Pos.List(i,1:2)));

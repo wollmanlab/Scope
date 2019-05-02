@@ -16,7 +16,8 @@ classdef ZincuScope < Scope
         
         
         function Mag = getOptovar(Scp)
-            Mag=10;
+            %regexp(Scp.Objective,'X')
+            Mag=str2double(Scp.Objective(1:regexp(Scp.Objective,'X')-1));
             Mag=Mag*0.63;
         end
         
@@ -158,7 +159,7 @@ classdef ZincuScope < Scope
             clf;
             set(468,'position',[400 600 50 300],'color','w','toolbar','none','dockcontrol','off','menubar','none','Name','Z','NumberTitle','off');
             sliderpos=str2double(Scp.mmc.getProperty('Focus','Position'));
-            h = uicontrol(468,'Style','slider','Min',-9000,'Max',1000,'Units','normalized','String','Z','Value',sliderpos,'Position',[0.35 0 0.65 1],'SliderStep',[0.0005 0.005]);
+            h = uicontrol(468,'Style','slider','Min',-10000,'Max',5000,'Units','normalized','String','Z','Value',sliderpos,'Position',[0.35 0 0.65 1],'SliderStep',[5/15000 50/15000]);
             addlistener(h,'Value','PostSet',@slidercallback);
             h.BackgroundColor='w'; 
             
@@ -174,6 +175,23 @@ classdef ZincuScope < Scope
                 Scp.mmc.setProperty('Focus','Position',num2str(sliderpos))
             end
 
+        end
+        
+        function changePlateRoutine(Scp,PlateName,x0y0)
+            Scp.Chamber = Plate(PlateName);
+
+            Scp.mmc.setProperty('Focus','Load Position',1);
+            Scp.mmc.setSerialPortCommand('COM1', 'HOME X', '\r');
+            Scp.X;
+            pause(5)
+
+            Scp.mmc.setSerialPortCommand('COM1', 'HOME Y', '\r');
+            Scp.Y;
+            pause(5)
+            Scp.Chamber.x0y0 = Scp.XY+x0y0;
+            Scp.Chamber.directionXY = [1 1];
+            Scp.reduceAllOverheadForSpeed=true;
+            Scp.mmc.setProperty('Focus','Load Position',0);
         end
         
     end
