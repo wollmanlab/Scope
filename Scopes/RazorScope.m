@@ -120,20 +120,30 @@ classdef RazorScope < Scope
             
             img = Scp.snapImage;%snap an image
             imXcorr = convnfft(ref-mean(ref(:)),rot90(img,2)-mean(img(:)),'same');%compare image to input ref
+            imXcorr(size(img,1)/2, size(img,2)/2) =imXcorr(size(img,1)/2-1, size(img,2)/2-1) ; %lazy way to avoid cross artifact
             [maxY, maxX] = find(imXcorr == max(imXcorr(:)));%find displacement
             
-            dY = maxY-size(img,1)/2
-            dX = maxX-size(img,2)/2
+            dY = maxY-size(img,1)/2;
+            dX = maxX-size(img,2)/2;
+            
+            dy1 = dY;
+            dx1 = dX;
+            
             Scp.Pos.List(:,1) = Scp.Pos.List(:,1)-dX; %update position list
             Scp.Pos.List(:,2) = Scp.Pos.List(:,2)-dY; %update position list
             Scp.goto(Scp.Pos.Labels{refImgInd}, Scp.Pos); %take new ref for next r0und
             
             img = Scp.snapImage;%snap an image
             imXcorr = convnfft(ref-mean(ref(:)),rot90(img,2)-mean(img(:)),'same');%compare image to input ref
+            imXcorr(size(img,1)/2, size(img,2)/2) =imXcorr(size(img,1)/2-1, size(img,2)/2-1) ; %lazy way to avoid cross artifact
             [maxY, maxX] = find(imXcorr == max(imXcorr(:)));%find displacement
             
             dY = maxY-size(img,1)/2;
             dX = maxX-size(img,2)/2;
+            
+            dy1 = dy1+dY
+            dx1 = dx1+dX
+            
             Scp.Pos.List(:,1) = Scp.Pos.List(:,1)-dX; %update position list
             Scp.Pos.List(:,2) = Scp.Pos.List(:,2)-dY; %update position list
             Scp.goto(Scp.Pos.Labels{refImgInd}, Scp.Pos); %take new ref for next r0und
@@ -1001,52 +1011,51 @@ classdef RazorScope < Scope
             stepsFileName = fullfile(procDirName,'steps');
             fid = fopen(stepsFileName, 'wt' );
             
-            fprintf( fid, 'Open terminal window and run:\n\n');
-            fprintf( fid, 'cd "%s"\n\n', repoDir);
+            fprintf( fid, 'As soon as anything appears on the analysis machine, Open terminal window and run:\n\n');
+            %fprintf( fid, 'cd "%s"\n\n', repoDir);
             %fprintf( fid, './MakeXMLDatasetJobSets.sh "%s"\n', MasterFileNameOnAnalysisBox);
             %fprintf( fid, '%s/Processing/xmljobs/DefineXML.job\n\n', FullPathOnAnalysisBox);
             %fprintf( fid, 'This will take some time, so go rest and do some productive things.\n\n');
             %fprintf( fid, 'Next, run:\n\n');
-            fprintf( fid, './MakeHDFExportJobsSets.sh "%s"\n', MasterFileNameOnAnalysisBox);
-            fprintf( fid, 'parallel --memfree -24G --load 90%% --delay 10 -j16 --retry-failed < %s/Processing/hdf5jobs/commands.txt\n\n', FullPathOnAnalysisBox);
+            fprintf( fid, '%s/OTFConvertToHDF5.sh "%s"\n\n', repoDir ,MasterFileNameOnAnalysisBox);
+            
             fprintf( fid, 'This will take some time, so go rest and do some productive things.\n\n');
-            fprintf( fid, 'Once this is done, the dataset is now saved in HDF5 format.\n\n\nOpen the set using BigStitcher to make sure everything is fine and delete the Tiffs. Time to start aligning!\n\n' );
+            fprintf( fid, 'Once this is done, the dataset is saved in HDF5 format.\n\n\nOpen the set using BigStitcher to make sure everything is fine and delete the Tiffs. Time to start aligning!\n\n' );
             %     fprintf( fid, 'First, we need to move the tiles to their location from the Tile Configuration File.\nUnfortunately this hasn`t been implemented in batch mode yet. Open BigStitcher and load the dataset.\nRight-click on any stack and select `Arrange Views-->Read Locations From File` etc. \n' );
             
             fprintf( fid, 'First, we need to move the tiles to their location from the Tile Configuration File.\n');
-            fprintf( fid, 'cd "%s"\n\n', repoDir);
+            %fprintf( fid, 'cd "%s"\n\n', repoDir);
             
-            fprintf( fid, './MakeLoadConfig.sh "%s"\n', MasterFileNameOnAnalysisBox);
-            fprintf( fid, '%s/Processing/LoadTileConfig.job\n\n', FullPathSetsOnAnalysisBox);
-            fprintf( fid, 'Next, we calculate the shifts between tiles using cross-correlation.\n');
+            fprintf( fid, '%s/loadTileConfig.sh "%s"\n\n',repoDir, MasterFileNameOnAnalysisBox);
+            %fprintf( fid, '%s/Processing/LoadTileConfig.job\n\n', FullPathSetsOnAnalysisBox);
+            fprintf( fid, 'Next, we stitch tiles using cross-correlation.\n');
 
-            fprintf( fid, './MakeCalculateShiftJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
-            fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j8 --retry-failed < %s/Processing/shiftjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
+            fprintf( fid, '%s/stitchTiles.sh "%s"\n\n',repoDir, MasterFileNameOnAnalysisBox);
+            %fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j8 --retry-failed < %s/Processing/shiftjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
             
-            fprintf( fid, 'Filter links and apply shifts using global optimization.\n');
+            %fprintf( fid, 'Filter links and apply shifts using global optimization.\n');
 
-            fprintf( fid, './MakeFilterAndOptimizeJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
-            fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j8 --retry-failed < %s/Processing/shiftjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
+            %fprintf( fid, './MakeFilterAndOptimizeJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+            %fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j8 --retry-failed < %s/Processing/shiftjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
                       
             
-            fprintf( fid, 'Merge the files created by different processes.\n');
+            %fprintf( fid, 'Merge the files created by different processes.\n');
 
-            fprintf( fid, '%s/Processing/MergeXMLs.sh\n\n', FullPathSetsOnAnalysisBox);
+            %fprintf( fid, '%s/Processing/MergeXMLs.sh\n\n', FullPathSetsOnAnalysisBox);
 
             fprintf( fid, 'Find interest points for the next steps.\n');
             
-            fprintf( fid, './MakeFindPointsJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
-            fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j12 --retry-failed < %s/Processing/beadsjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
-            fprintf( fid, '%s/Processing/MergeXMLs.sh\n', FullPathSetsOnAnalysisBox);
+            fprintf( fid, '%s/findBeads.sh "%s"\n\n',repoDir, MasterFileNameOnAnalysisBox);
+            %fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j12 --retry-failed < %s/Processing/beadsjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
+            %fprintf( fid, '%s/Processing/MergeXMLs.sh\n', FullPathSetsOnAnalysisBox);
             %fprintf( fid, '%s/Processing/beadsjobs/commands.sh\n\n', FullPathSetsOnAnalysisBox);
             
              if nChannels>1 %ICP refinement for chromatic aberations
                 fprintf( fid, 'Since we have more than 1 channel, we want to fix some "chromatic aberations".\n\n');
-                fprintf( fid, 'cd "%s"\n', repoDir);
-                fprintf( fid, './MakeICPJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
+                fprintf( fid, '%s/fixChromaticAbberations.sh "%s"\n\n',repoDir, MasterFileNameOnAnalysisBox);
 %                fprintf( fid, '%s/Processing/ICPjobs/commands.sh\n\n', FullPathSetsOnAnalysisBox);
-                fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j16 --retry-failed < %s/Processing/ICPjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
-                fprintf( fid, '%s/Processing/MergeXMLs.sh\n', FullPathSetsOnAnalysisBox);
+                %fprintf(fid, 'parallel --memfree -24G --load 90%% --delay 5 -j16 --retry-failed < %s/Processing/ICPjobs/commands.txt\n\n', FullPathSetsOnAnalysisBox);
+                %fprintf( fid, '%s/Processing/MergeXMLs.sh\n', FullPathSetsOnAnalysisBox);
              end      
             
             
@@ -1055,15 +1064,19 @@ classdef RazorScope < Scope
             fprintf( fid, 'Now, align the first timepoint using the BDV GUI. Make sure everything looks right.\n' );
             fprintf( fid, 'save and close Fiji.\n\n' );
             fprintf( fid, 'We align iteratively by inhereting all the previous transformations.\n\n' );
-            fprintf( fid, 'cd "%s"\n', repoDir);
-            fprintf( fid, './MakeMultiviewPropJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
-            fprintf( fid, '%s/Processing/multiviewjobs/MultiviewProp.job\n\n', FullPathSetsOnAnalysisBox);
+            %fprintf( fid, 'cd "%s"\n', repoDir);
+            fprintf( fid, '%s/multiviewReconstructionPropagate.sh "%s"\n\n',repoDir, MasterFileNameOnAnalysisBox);
+            %fprintf( fid, '%s/Processing/multiviewjobs/MultiviewProp.job\n\n', FullPathSetsOnAnalysisBox);
             
 
             
             fprintf( fid, 'Fix drift.\n\n' );
-            fprintf( fid, './MakeStabilizeJobs.sh "%s"\n', MasterFileNameOnAnalysisBox);
-            fprintf( fid, '%s/Processing/stabilizejobs/commands.sh\n\n', FullPathSetsOnAnalysisBox);
+            fprintf( fid, '%s/driftCorrection.sh "%s"\n\n', repoDir, MasterFileNameOnAnalysisBox);
+            %fprintf( fid, '%s/Processing/stabilizejobs/commands.sh\n\n', FullPathSetsOnAnalysisBox);
+            
+            
+            fprintf( fid, 'Finally, fuse dataset.\n\n' );
+            fprintf( fid, '%s/Fuse.sh "%s"\n\n', repoDir, MasterFileNameOnAnalysisBox);
             
             fclose(fid);
             
