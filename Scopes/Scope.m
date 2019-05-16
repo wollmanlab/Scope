@@ -896,7 +896,7 @@ classdef (Abstract) Scope < handle
             lbl = Scp.Chamber.Wells(mi);
         end
         
-        function goto(Scp,label,Pos,varargin)
+        function err = goto(Scp,label,Pos,varargin)
             
             Scp.TimeStamp = 'startmove';
             arg.plot = true;
@@ -945,10 +945,18 @@ classdef (Abstract) Scope < handle
             end
             
             % update display (unless low overhead is enabled)
-            if ~Scp.reduceAllOverheadForSpeed && arg.plot
+            if arg.plot %Scp.reduceAllOverheadForSpeed &&
                 plot(Pos,Scp,'fig',Scp.Chamber.Fig.fig,'label',label,'single',single);
             end
             Scp.TimeStamp = 'endmove';
+            ifMulti = regexp(label,'_');
+            if ifMulti
+            label = label(1:ifMulti(1)-1);
+            end
+            err =~strcmp(Scp.whereami,label); %return err=1 if end position doesnt match label
+            if err
+               warning('stage position doesn`t match label') 
+            end
         end
         
         function when = getTimeStamp(Scp,what)
@@ -1242,7 +1250,8 @@ classdef (Abstract) Scope < handle
                 elseif numel(Pos.axis)==2
                     WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY];
                 elseif numel(Pos.axis)==3
-                    WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY, Scp.Z];
+
+                    WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY, repmat(Scp.Z, numel(Xwell),1)];
                 end
                 
                 %% add up to long list
@@ -1930,12 +1939,12 @@ classdef (Abstract) Scope < handle
             %Works really well with Hoescht:
             %Scp.ImageBasedFocusHillClimb('channel','Brightfield','exposure',20,'resize',0.25,'scale',50)
             
-            arg.scale = 2; % if True will acq multiple channels per Z movement.
-            arg.resize =1;
-            arg.channel = 'DeepBlue'; % if True will acq multiple channels per Z movement.
-            arg.exposure =10;
-            % False will acq a Z stack per color.
-            arg = parseVarargin(varargin,arg);
+            arg.scale = ParseInputs('scale',Scp.AFparam.scale,varargin);
+            arg.resize = ParseInputs('resize',Scp.AFparam.resize,varargin);
+            arg.channel = ParseInputs('channel',Scp.AFparam.channel,varargin);
+            arg.exposure = ParseInputs('exposure',Scp.AFparam.exposure,varargin);
+            
+            
             %% Set channels and exposure
             Scp.Channel=arg.channel;
             Scp.Exposure=arg.exposure;
@@ -1949,9 +1958,10 @@ classdef (Abstract) Scope < handle
             clf
             
             Zinit = Scp.Z;
-            dZ = 50;
+            dZ = 35*(6.3/Scp.Optovar)^2;
             sgn = 1;
-            acc = 50^(1/5);
+
+            acc = dZ^(1/5);
             cont1=Scp.Contrast('scale',arg.scale,'resize',arg.resize);  %measure of contrast
             Zs = [Zs Scp.Z];
             Conts = [Conts cont1];
@@ -2073,13 +2083,15 @@ classdef (Abstract) Scope < handle
             set(445,'Windowstyle','normal','toolbar','none','menubar','none','Position',[700 892 300 75],'Name','Please find focus in first well','NumberTitle','off')
             uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
             uiwait(445)
-            Scp.Pos.List(:,3) = Scp.Z;
+
+            dZ1 = Scp.Z-Scp.Mishor.Zpredict(Scp.XY);
+            Scp.Pos.List(:,3) = Scp.Mishor.Zpredict(Scp.Pos.List(:,1:2))+dZ1;
             ManualZ = Scp.Z;
             for i=1:Scp.Pos.N
                 Scp.goto(Scp.Pos.Labels{i}, Scp.Pos)
                 Zfocus = Scp.ImageBasedFocusHillClimb(varargin{:});
                 if i==1
-                    dZ = ManualZ-Zfocus;%difference bw what I call focus and what Mr. computer man thinks.
+                    dZ = 0;%ManualZ-Zfocus;%difference bw what I call focus and what Mr. computer man thinks.
                 end
                 Scp.Pos.List(i,3) = Zfocus+dZ;
             end

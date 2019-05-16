@@ -8,19 +8,21 @@ classdef IncuScope < Scope
         SHT15port = serial('COM10','baudrate',9600);
         ASI = ASIcontroller;
         DichroicsPerChannel;
+        Mishor;
     end
     
     %% Methods
     methods
         function Objective = getObjective(Scp)
-            Objective = 'You Guys miss Yanfei, yet?, yes we do....';
+            Objective = '10X 0.45NA';
         end
         
         function PixelSize = getPixelSize(Scp)
             %PixelSize = Scp.mmc.getPixelSizeUm;
-            Mag = 5.1;
+            Mag = 8;
             CamPixSize = 3.45;
-            PixelSize = CamPixSize/Mag;
+            BinnningFactor = str2double(Scp.mmc.getProperty(Scp.CameraName,'Binning'));
+            PixelSize = BinnningFactor*CamPixSize/Mag;
         end
         
         
@@ -32,9 +34,12 @@ classdef IncuScope < Scope
             Scp.initTempHumSenor;
             if strcmp(chnl,'Brightfield')
                 % do this
-                fwrite(Scp.SHT15port,'bright ,20')
+                Scp.mmc.setProperty('Core','AutoShutter', '0')
+                Scp.mmc.setProperty('ExShutter','State', '0')
+                fwrite(Scp.SHT15port,'bright ,100')
             else
                 % make sure brightfield if off
+                Scp.mmc.setProperty('Core','AutoShutter', '1')
                 fwrite(Scp.SHT15port,'bright ,0')
             end
             % figure out what dichroic we need and move there.
@@ -139,6 +144,14 @@ classdef IncuScope < Scope
                 case 'hardware'
                     disp('autofocus using crisp');
                     Scp.studio.autofocusNow();
+                case 'plane'
+                    if isempty(Scp.Mishor)
+                        error('Plane has not been initialized.');
+                    end
+                    zOffset = Scp.Pos.getzOffset;
+                    z = Scp.Mishor.Zpredict(Scp.XY)+zOffset;
+                    Scp.Z = z;
+                    fprintf('I autofocused! moved to %.2f \n',z);
                 case 'software'
                     Zfocus = Scp.ImageBasedFocusHillClimb('channel',AcqData.Channel,'exposure',AcqData.Exposure);
                     Scp.Z=Zfocus;
