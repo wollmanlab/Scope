@@ -78,6 +78,8 @@ classdef (Abstract) Scope < handle
         %% software image based autofocus related parameters
         AutoFocusType = 'Hardware'; % Software / Hardware / DefiniteFocus / None
         autogrid=10;
+        AFparam=struct('scale',2,'resize',1,'channel','DeepBlue','exposure',10); 
+        
         AFgrid
         AFscr
         AFlog=struct('Time',[],'Z',[],'Score',[],'Channel','','Type','');
@@ -306,7 +308,7 @@ classdef (Abstract) Scope < handle
                     filename2ds = fullfile(acqname,filename); 
                     NFrames = Scp.Pos.ExperimentMetadata(Scp.Pos.current).nFrames;
                     dz = Scp.Pos.ExperimentMetadata(Scp.Pos.current).dz;
-                    Scp.ZStage.Velocity = 8;
+                    Scp.ZStage.Velocity = Scp.imagingVelocity;%Scp.imagingVelocity;
                     Scp.ZStage.moveWithDelay(dz*NFrames);
                     tic;
                     Scp.snapSeqDatastore(Scp.pth,filename2ds,NFrames)
@@ -393,11 +395,13 @@ classdef (Abstract) Scope < handle
         %% snapSeq using datastore on the SSD
         function snapSeqDatastore(Scp,pth,filename,NFrames)
             store = Scp.studio.data().createMultipageTIFFDatastore([pth filesep filename],false,false);
-            Scp.studio.displays().manage(store);
+            %Scp.studio.displays().manage(store);
             %Scp.studio.displays().createDisplay(store);
             builder = Scp.studio.data().getCoordsBuilder().z(0).channel(0).stagePosition(0);
             curFrame = 0;
             Scp.mmc.startSequenceAcquisition(NFrames, 0, false);
+            tToc = toc;
+            pause(0.4-tToc);
             toc;
             while((Scp.mmc.getRemainingImageCount()>0) || (Scp.mmc.isSequenceRunning(Scp.mmc.getCameraDevice())))
                 if (Scp.mmc.getRemainingImageCount()>0)
@@ -408,8 +412,16 @@ classdef (Abstract) Scope < handle
                     clear timg;
                     Scp.mmc.getRemainingImageCount();
                 else
-                    Scp.mmc.sleep(min(0.25*Scp.Exposure,1));
+                    Scp.mmc.sleep(min(Scp.Exposure,10));
                 end
+            end
+            
+            while store.getNumImages<NFrames %fix annoying -1 problem - AOY
+                timg = Scp.mmc.getTaggedImage;
+                curFrame=curFrame+1;
+                img = Scp.studio.data().convertTaggedImage(timg, builder.time(curFrame).build(),'');
+                store.putImage(img);
+                clear timg;
             end
             
             Scp.mmc.stopSequenceAcquisition();
@@ -606,6 +618,11 @@ classdef (Abstract) Scope < handle
                 acqname = arg.acqname;
             end
             
+            
+            if Scp.Strobbing
+                Scp.prepareProcessingFilesBefore(AcqData);
+            end
+            
             %% Add channel sequence to trigger device (if any)
             Scp.setTriggerChannelSequence(AcqData);
             
@@ -657,7 +674,7 @@ classdef (Abstract) Scope < handle
                 Scp.MD.saveMetadata(fullfile(Scp.pth,acqname));
             end
             
-            
+            disp('I`m done now. Thank you.')
         end
         
         function logError(Scp,msg,varargin)
@@ -724,7 +741,7 @@ classdef (Abstract) Scope < handle
              warning('Not implemented in Scope - overload to use!')
         end
         
-        function [z,s]=autofocus(Scp,AcqData) %#ok<STOUT,INUSD>
+        function [z,s]=autofocus(Scp) %#ok<STOUT,INUSD>
             warning('Not implemented in Scope - overload to use!')
         end
         
@@ -909,7 +926,7 @@ classdef (Abstract) Scope < handle
             lbl = Scp.Chamber.Wells(mi);
         end
         
-        function goto(Scp,label,Pos,varargin)
+        function err = goto(Scp,label,Pos,varargin)
             
             Scp.TimeStamp = 'startmove';
             arg.plot = true;
@@ -921,7 +938,7 @@ classdef (Abstract) Scope < handle
                 Pos  = Scp.createPositions('tmp',true,'prefix','');
                 single = arg.single;
             else
-                if ~isa(Pos,'Position')
+                if ~isa(Pos,'Positions')
                     Pos = Scp.Pos;
                 end
                 single = false;
@@ -958,10 +975,18 @@ classdef (Abstract) Scope < handle
             end
             
             % update display (unless low overhead is enabled)
-            if ~Scp.reduceAllOverheadForSpeed && arg.plot
+            if arg.plot %Scp.reduceAllOverheadForSpeed &&
                 plot(Pos,Scp,'fig',Scp.Chamber.Fig.fig,'label',label,'single',single);
             end
             Scp.TimeStamp = 'endmove';
+            ifMulti = regexp(label,'_');
+            if ifMulti
+            label = label(1:ifMulti(1)-1);
+            end
+            err =~strcmp(Scp.whereami,label); %return err=1 if end position doesnt match label
+            if err
+               warning('stage position doesn`t match label') 
+            end
         end
         
         function when = getTimeStamp(Scp,what)
@@ -1176,6 +1201,7 @@ classdef (Abstract) Scope < handle
             Scp.currentAcq=Scp.currentAcq+1;
             arg.msk = true(Plt.sz);
             arg.wells = Plt.Wells;
+            arg.axis={'XY'};
             arg.sitesperwell = [1 1]; % [x y]
             arg.alignsites = 'center';
             arg.sitesshape = 'grid';
@@ -1222,6 +1248,7 @@ classdef (Abstract) Scope < handle
             else
                 Pos=Positions;
             end
+            Pos.axis = arg.axis;
             Pos.PlateType = Plt.type;
             
             %% add to the position list well by well
@@ -1250,8 +1277,14 @@ classdef (Abstract) Scope < handle
                 end
                 
                 %% set up XY
-                WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY];
-                
+                if Pos.axis{1}=='XY'
+                    WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY];
+                elseif numel(Pos.axis)==2
+                    WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY];
+                elseif numel(Pos.axis)==3
+
+                    WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY, repmat(Scp.Z, numel(Xwell),1)];
+                end
                 
                 %% add up to long list
                 Pos = add(Pos,WellXY,WellLabels);
@@ -1940,6 +1973,175 @@ classdef (Abstract) Scope < handle
             dXY=[dX_micron dY_micron];
             Scp.dXY=dXY;
             
+        end
+        
+        
+        
+        
+        %software autofocus related stuff
+        
+        function Zfocus = ImageBasedFocusHillClimb(Scp,varargin)
+            %Works pretty well with BF:
+            %Scp.ImageBasedFocusHillClimb('channel','Brightfield','exposure',20,'resize',0.25,'scale',50)
+            %Works really well with Hoescht:
+            %Scp.ImageBasedFocusHillClimb('channel','Brightfield','exposure',20,'resize',0.25,'scale',50)
+            
+            arg.scale = ParseInputs('scale',Scp.AFparam.scale,varargin);
+            arg.resize = ParseInputs('resize',Scp.AFparam.resize,varargin);
+            arg.channel = ParseInputs('channel',Scp.AFparam.channel,varargin);
+            arg.exposure = ParseInputs('exposure',Scp.AFparam.exposure,varargin);
+            
+            
+            %% Set channels and exposure
+            Scp.Channel=arg.channel;
+            Scp.Exposure=arg.exposure;
+            
+            Zs = [];
+            Conts = [];
+            
+            figure(157),
+            set(157,'menubar','none','Name','Finding focus by contrast','NumberTitle','off')
+            
+            clf
+            
+            Zinit = Scp.Z;
+            dZ = 35*(6.3/Scp.Optovar)^2;
+            sgn = 1;
+
+            acc = dZ^(1/5);
+            cont1=Scp.Contrast('scale',arg.scale,'resize',arg.resize);  %measure of contrast
+            Zs = [Zs Scp.Z];
+            Conts = [Conts cont1];
+            
+            plot(Scp.Z,cont1,'o')
+            hold all
+            
+            %determine direction of motion
+            
+            Scp.Z = Scp.Z+sgn*dZ;
+            cont2=Scp.Contrast('scale',arg.scale,'resize',arg.resize);
+            
+            Zs = [Zs Scp.Z];
+            Conts = [Conts cont2];
+            
+            plot(Scp.Z,cont2,'o')
+            
+            if cont2<cont1
+                sgn = -sgn;
+                Scp.Z = Scp.Z+2*sgn*dZ;
+                cont2=Scp.Contrast('scale',arg.scale,'resize',arg.resize);
+                set(157,'menubar','none','Name','Finding focus by contrast','NumberTitle','off')
+                
+                Zs = [Zs Scp.Z];
+                Conts = [Conts cont2];
+                
+                plot(Scp.Z,cont2,'o');
+                if cont2<cont1
+                    dZ=dZ/(acc^2);
+                    Scp.Z = Zinit;%start over with smaller region
+                    cont1=Scp.Contrast('scale',arg.scale,'resize',arg.resize);  %measure of contrast
+                    
+                    Scp.Z = Scp.Z+sgn*dZ;
+                    cont2=Scp.Contrast('scale',arg.scale,'resize',arg.resize);
+                    
+                    Zs = [Zs Scp.Z];
+                    Conts = [Conts cont2];
+                    
+                    plot(Scp.Z,cont2,'o')
+                    if cont2<cont1
+                        sgn = -sgn;
+                        Scp.Z = Scp.Z+2*sgn*dZ;
+                        cont2=Scp.Contrast('scale',arg.scale,'resize',arg.resize);
+                        
+                        
+                        Zs = [Zs Scp.Z];
+                        Conts = [Conts cont2];
+                        
+                        plot(Scp.Z,cont2,'o');
+                        drawnow;
+                    end
+                    %sgn = -sgn;
+                end
+            end
+            
+            while dZ>1
+                while cont2>=cont1
+                    cont1=cont2;
+                    Scp.Z = Scp.Z+sgn*dZ;
+                    cont2=Scp.Contrast('scale',arg.scale,'resize',arg.resize);
+                    figure(157);
+                    
+                    Zs = [Zs Scp.Z];
+                    Conts = [Conts cont2];
+                    
+                    plot(Scp.Z,cont2,'o')
+                    drawnow;
+
+                end
+                dZ = dZ/acc;
+                sgn=-sgn;
+                cont1=cont2;
+            end
+            
+            Zfocus = mean(Zs(Conts==max(Conts)));
+            
+            %Zfocus = Scp.Z+sgn*dZ*acc;
+            Scp.Z = Zinit;
+        end
+        
+        
+        function cont = Contrast(Scp,varargin)
+            arg.scale = 2; % if True will acq multiple channels per Z movement.
+            arg.resize =1;
+            % False will acq a Z stack per color.
+            arg = parseVarargin(varargin,arg);
+            img=imresize(Scp.snapImage, arg.resize);
+            m=img-imgaussfilt(img,arg.scale);
+            m = m(200:end,200:end);
+            rng=prctile(m(:),[1 99]);
+            cont=rng(2)-rng(1);
+        end
+        
+        function focusAdjust(Scp,varargin)
+            arg.Diff = -30;
+            arg.scale = 2; % if True will acq multiple channels per Z movement.
+            arg.resize =1;
+            arg.channel = 'DeepBlue'; % if True will acq multiple channels per Z movement.
+            arg.exposure =10;
+            arg = parseVarargin(varargin,arg);
+            
+            Scp.goto(Scp.Pos.Labels{1}, Scp.Pos)
+            Zfocus = Scp.ImageBasedFocusHillClimb(varargin{:});
+            
+            dZ = Zfocus-Scp.Z+arg.Diff;
+            Scp.Pos.List(:,3) = Scp.Pos.List(:,3)+dZ;
+        end
+        
+        function dZ = findInitialFocus(Scp,varargin)
+            arg.scale = 2; % if True will acq multiple channels per Z movement.
+            arg.resize =1;
+            arg.channel = 'DeepBlue'; % if True will acq multiple channels per Z movement.
+            arg.exposure =20;
+            
+            arg = parseVarargin(varargin,arg);
+            
+            Scp.goto(Scp.Pos.Labels{1}, Scp.Pos)
+            figure(445)
+            set(445,'Windowstyle','normal','toolbar','none','menubar','none','Position',[700 892 300 75],'Name','Please find focus in first well','NumberTitle','off')
+            uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
+            uiwait(445)
+
+            dZ1 = Scp.Z-Scp.Mishor.Zpredict(Scp.XY);
+            Scp.Pos.List(:,3) = Scp.Mishor.Zpredict(Scp.Pos.List(:,1:2))+dZ1;
+            ManualZ = Scp.Z;
+            for i=1:Scp.Pos.N
+                Scp.goto(Scp.Pos.Labels{i}, Scp.Pos)
+                Zfocus = Scp.ImageBasedFocusHillClimb(varargin{:});
+                if i==1
+                    dZ = 0;%ManualZ-Zfocus;%difference bw what I call focus and what Mr. computer man thinks.
+                end
+                Scp.Pos.List(i,3) = Zfocus+dZ;
+            end
         end
         
     end

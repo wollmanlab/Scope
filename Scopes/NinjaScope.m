@@ -177,7 +177,7 @@ classdef NinjaScope < Scope
             AcqData = AcqData(possorders(mi,:));
         end
         
-        function [z,s]=autofocus(Scp,AcqData)
+        function [z,s]=autofocus(Scp)
             %             persistent XY;
             z=nan;
             s=nan;
@@ -312,5 +312,6 @@ classdef NinjaScope < Scope
             end
             
         end
+
     end
 end
