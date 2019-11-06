@@ -45,6 +45,7 @@ classdef MishorAutofocus < handle
                     W.Pos.List(i,3) = Scp.Z;
                 end
                 W.findFocusMarks(Scp,varargin{:});
+
             end
             
             

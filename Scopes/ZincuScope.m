@@ -147,6 +147,7 @@ classdef ZincuScope < Scope
                     end
                     z = Scp.ImageBasedFocusHillClimb;
                     Scp.Z=z;
+                    fprintf('I software autofocused! moved to %.2f \n',z);
                 otherwise
                     error('Please define type of autofocus (as None if none exist)')
             end
