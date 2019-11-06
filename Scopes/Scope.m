@@ -926,7 +926,7 @@ classdef (Abstract) Scope < handle
             lbl = Scp.Chamber.Wells(mi);
         end
         
-        function err = goto(Scp,label,Pos,varargin)
+        function goto(Scp,label,Pos,varargin)
             
             Scp.TimeStamp = 'startmove';
             arg.plot = true;
@@ -1339,7 +1339,7 @@ classdef (Abstract) Scope < handle
             
             % allow for Z correction
             if arg.manualoverride
-                unqGroup=unique(Pos.Group);
+                unqGroup=unique(Pos.Group,'stable'); %added 'stable' to prevent flips
                 for i=1:numel(unqGroup)
                     Scp.goto(unqGroup{i});
                     Scp.whereami
@@ -2005,7 +2005,7 @@ classdef (Abstract) Scope < handle
             clf
             
             Zinit = Scp.Z;
-            dZ = 35*(6.3/Scp.Optovar)^2;
+            dZ = 25*(6.3/Scp.Optovar)^2;
             sgn = 1;
 
             acc = dZ^(1/5);
@@ -2125,7 +2125,7 @@ classdef (Abstract) Scope < handle
             
             arg = parseVarargin(varargin,arg);
             
-            Scp.goto(Scp.Pos.Labels{1}, Scp.Pos)
+            Scp.goto(Scp.Pos.Labels{1}, Scp.Pos);
             figure(445)
             set(445,'Windowstyle','normal','toolbar','none','menubar','none','Position',[700 892 300 75],'Name','Please find focus in first well','NumberTitle','off')
             uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
@@ -2135,7 +2135,7 @@ classdef (Abstract) Scope < handle
             Scp.Pos.List(:,3) = Scp.Mishor.Zpredict(Scp.Pos.List(:,1:2))+dZ1;
             ManualZ = Scp.Z;
             for i=1:Scp.Pos.N
-                Scp.goto(Scp.Pos.Labels{i}, Scp.Pos)
+                Scp.goto(Scp.Pos.Labels{i}, Scp.Pos);
                 Zfocus = Scp.ImageBasedFocusHillClimb(varargin{:});
                 if i==1
                     dZ = 0;%ManualZ-Zfocus;%difference bw what I call focus and what Mr. computer man thinks.

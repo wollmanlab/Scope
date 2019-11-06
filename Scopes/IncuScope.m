@@ -25,10 +25,12 @@ classdef IncuScope < Scope
             PixelSize = BinnningFactor*CamPixSize/Mag;
         end
         
-        
         function Mag = getOptovar(Scp)
-            Mag = 1;
+            %regexp(Scp.Objective,'X')
+            Mag=str2double(Scp.Objective(1:regexp(Scp.Objective,'X')-1));
+            Mag=Mag*0.8;
         end
+    
         
         function setChannel(Scp,chnl)
             Scp.initTempHumSenor;
