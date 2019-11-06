@@ -1306,7 +1306,7 @@ classdef (Abstract) Scope < handle
             
             % allow for Z correction
             if arg.manualoverride
-                unqGroup=unique(Pos.Group);
+                unqGroup=unique(Pos.Group,'stable'); %added 'stable' to prevent flips
                 for i=1:numel(unqGroup)
                     Scp.goto(unqGroup{i});
                     Scp.whereami
@@ -1957,7 +1957,7 @@ classdef (Abstract) Scope < handle
             clf
             
             Zinit = Scp.Z;
-            dZ = 35*(6.3/Scp.Optovar)^2;
+            dZ = 25*(6.3/Scp.Optovar)^2;
             sgn = 1;
             acc = dZ^(1/5);
             cont1=Scp.Contrast('scale',arg.scale,'resize',arg.resize);  %measure of contrast

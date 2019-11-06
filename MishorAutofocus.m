@@ -37,6 +37,7 @@ classdef MishorAutofocus < handle
                     uiwait(445)
                     W.Pos.List(i,3) = Scp.Z;
                 end
+                W.findFocusMarks(Scp,varargin{:})
             end
             
             
