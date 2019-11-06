@@ -3,6 +3,7 @@ classdef Plate < Chamber
        sz;
        Wells = {};
        x0y0; % position of the upper left well (e.g. A01)
+       x1y1; % for determining well dimensions in PDMS
        tform; % an optional transformation that came from plate calibration. 
        wellSpacingXY
        wellDimensions
@@ -219,7 +220,17 @@ classdef Plate < Chamber
                    P.directionXY = [1 1];
                    P.wellSpacingXY = [9000 8500]; 
                    P.Wells = {  'TL'    'TR'  
-                                'BL'    'BR'};             
+                                'BL'    'BR'};   
+               case 'Evans PDMS'
+                   P.numOfsubChambers=1; 
+                   P.type = type;
+                   P.sz = [1 1];
+                   P.wellCurvature = [1 1];
+                   P.x0y0 = [-5462         939]; % change (center)
+                   P.wellDimensions=abs([-2625       -1989]-[-8299        3867]); % (top left - bot right)
+                   P.directionXY = [-1 1];
+                   P.wellSpacingXY = [0 0]; 
+                   P.Wells = {'CR'}; 
                case 'Labtek 8-wells'
                    P.numOfsubChambers=8; 
                    P.type = type;
