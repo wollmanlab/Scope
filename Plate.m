@@ -3,6 +3,7 @@ classdef Plate < Chamber
        sz;
        Wells = {};
        x0y0; % position of the upper left well (e.g. A01)
+       x1y1; % for determining well dimensions in PDMS
        tform; % an optional transformation that came from plate calibration. 
        wellSpacingXY
        wellDimensions
@@ -62,7 +63,24 @@ classdef Plate < Chamber
                            W{i,j}=[R(i) sprintf('%02.0f',j)]; 
                        end
                    end
-                   P.Wells=W;            
+                   P.Wells=W;  
+                   
+               case 'BioLite48 (130187)'
+                   P.numOfsubChambers=48; 
+                   P.type = type;
+                   P.sz = [6 8];
+                   P.wellDimensions=[12000 12000]; 
+                   P.wellCurvature = [1 1];
+                   P.x0y0 = [45085      -31676];
+                   P.directionXY = [-1 1];
+                   P.wellSpacingXY = [12989 12799];
+                   P.Wells = {  'A01'    'A02'    'A03'    'A04'    'A05'    'A06'    'A07'    'A08'
+                                'B01'    'B02'    'B03'    'B04'    'B05'    'B06'    'B07'    'B08'
+                                'C01'    'C02'    'C03'    'C04'    'C05'    'C06'    'C07'    'C08'
+                                'D01'    'D02'    'D03'    'D04'    'D05'    'D06'    'D07'    'D08'
+                                'E01'    'E02'    'E03'    'E04'    'E05'    'E06'    'E07'    'E08'
+                                'F01'    'F02'    'F03'    'F04'    'F05'    'F06'    'F07'    'F08'};
+                            
                case 'Costar24 (3526)'
                    P.numOfsubChambers=24; 
                    P.type = type;
@@ -89,6 +107,7 @@ classdef Plate < Chamber
                                 'B01'    'B02'    'B03'    'B04'
                                 'C01'    'C02'    'C03'    'C04'}; 
                case 'Costar6 (3516)'
+                   % Focus around 4230 um
                    P.numOfsubChambers=6; 
                    P.type = type;
                    P.sz = [2 3];
@@ -201,14 +220,27 @@ classdef Plate < Chamber
                    P.directionXY = [1 1];
                    P.wellSpacingXY = [9000 8500]; 
                    P.Wells = {  'TL'    'TR'  
-                                'BL'    'BR'};             
+                                'BL'    'BR'};   
+               case 'Evans PDMS'
+                   P.numOfsubChambers=1; 
+                   P.type = type;
+                   P.sz = [1 1];
+                   P.wellCurvature = [1 1];
+                   P.x0y0 = [-5462         939]; % change (center)
+                   P.wellDimensions=abs([-2625       -1989]-[-8299        3867]); % (top left - bot right)
+                   P.directionXY = [-1 1];
+                   P.wellSpacingXY = [0 0]; 
+                   P.Wells = {'CR'}; 
                case 'Labtek 8-wells'
                    P.numOfsubChambers=8; 
                    P.type = type;
-                   P.sz=[2 4];
-                   P.x0y0 = [ ]; %Has to be determined by Scope stage in ScopeStartup config file
-                   P.wellSpacingXY = [nan nan]; %TODO = put right valuse
-                   P.Wells 
+                   P.sz=[4 2];
+                   P.wellDimensions=[9000 9000]; % Estimate
+                   P.wellCurvature = [1 1];
+                   P.directionXY = [-1 -1];
+                   P.x0y0 = [21072      -28563]; %Has to be determined by Scope stage in ScopeStartup config file
+                   P.wellSpacingXY = [12033 -11631]; 
+                   P.Wells = {'A1' 'A2' 'A3' 'A4' 'B1' 'B2' 'B3' 'B4'};
                case 'Microfluidics Wounding Device Ver 3.0'
                    P.numOfsubChambers = 1; 
                    P.type = type; 
@@ -227,6 +259,34 @@ classdef Plate < Chamber
                    P.Wells = {'Coverslip'}; 
                    P.wellDimensions = [10000 10000]; 
                    P.wellCurvature = [0 0];  
+               case 'Frame_Seal_65'
+                   % at 1X optivar, the pixel size is 2.2857
+                   % 65 uL is 15 mm by 15 mm
+                   % 6562 pixels by 6562 pixels is the width
+                   % width is 2448 pixels
+                   % heigh is 2048 pixels
+                   % need a 3x4 image for full sizing
+                   P.numOfsubChambers = 12; 
+                   P.type = type;  
+                   P.sz = [7 7];
+                   P.x0y0 = []; %ask at beginning
+                   P.directionXY = [-1 1];
+                   P.Wells = {'A1' 'A2' 'A3' 'A4' 'A5' 'A6' 'A7' 
+                              'B1' 'B2' 'B3' 'B4' 'B5' 'B6' 'B7'
+                              'C1' 'C2' 'C3' 'C4' 'C5' 'C6' 'C7'
+                              'D1' 'D2' 'D3' 'D4' 'D5' 'D6' 'D7'
+                              'E1' 'E2' 'E3' 'E4' 'E5' 'E6' 'E7'
+                              'F1' 'F2' 'F3' 'F4' 'F5' 'F6' 'F7'
+                              'G1' 'G2' 'G3' 'G4' 'G5' 'G6' 'G7'};
+                   P.wellSpacingXY = [2448 2048];  
+                   P.wellDimensions = [2448 2048]; 
+                   P.wellCurvature = [0 0];  
+                   % top left position is 22105      -23005
+                   % bottom right position is 8254      -10248
+                   % different is 13851 -12757
+                   % six images by seven images
+                   
+              
                case '50mm Matek Chamber'
                    P.numOfsubChambers = 1; 
                    P.type = type; 

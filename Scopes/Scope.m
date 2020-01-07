@@ -21,6 +21,11 @@ classdef (Abstract) Scope < handle
         
         Objective
         ObjectiveOffsets
+        CameraAngle = 0;
+        
+        
+        %%
+        lastImg;
         
         %% User etc
         Username
@@ -446,7 +451,7 @@ classdef (Abstract) Scope < handle
                 Scp.Exposure=AcqData(i).Exposure;
                 % use createFlatFieldImage with defaults beside increase
                 % iterations
-                flt = createFlatFieldImage(Scp,'filter',true,'iter',15,'assign',true,'meanormedian','median');
+                flt = createFlatFieldImage(Scp,'filter',true,'iter',30,'assign',true,'meanormedian','mean','gauss', fspecial('gauss',30,3));
                 Scp.snapImage;
                 figure(321)
                 imagesc(flt);
@@ -461,6 +466,29 @@ classdef (Abstract) Scope < handle
                 
             end
         end
+        
+        
+        function saveFlatFieldsInPlace(Scp,AcqData)
+            for i=1:numel(AcqData)
+                if ~AcqData(i).Triggered
+                    Scp.updateState(AcqData(i));
+                end
+                try
+                    flt = getFlatFieldImage(Scp);
+                    filename = sprintf('flt_%s.tif',Scp.CurrentFlatFieldConfig);
+                catch
+                    warning('Flat field failed with channel %s, error message %s, moving on...',Scp.Channel,e.message);
+                    flt=ones([Scp.Height Scp.Width]);
+                    filename=sprintf('flt_%s.tif',AcqData(i).Channel);
+                end
+                
+                
+                %% save that channel to drive outside of metadata
+                imwrite(uint16(mat2gray(flt)*2^16),fullfile(Scp.pth,filename));
+            end
+        end
+        
+        
         
         % get the flat field for current configuration
         function flt = getFlatFieldImage(Scp,varargin)
@@ -482,6 +510,7 @@ classdef (Abstract) Scope < handle
                 warning('Flat field failed with channel %s, error message %s, moving on...',Scp.Channel,e.message);
                 flt=ones([Scp.Width Scp.Height]);
             end
+            flt = flt';
         end
         
         function  img = doFlatFieldCorrection(Scp,img,varargin)
@@ -613,6 +642,7 @@ classdef (Abstract) Scope < handle
                     flt = getFlatFieldImage(Scp);
                     filename = sprintf('flt_%s.tif',Scp.CurrentFlatFieldConfig);
                 catch
+                    warning('Flat field failed with channel %s, error message %s, moving on...',Scp.Channel,e.message);
                     flt=ones([Scp.Height Scp.Width]);
                     filename=sprintf('flt_%s.tif',AcqData(i).Channel);
                 end
@@ -867,7 +897,7 @@ classdef (Abstract) Scope < handle
             arg.xymove = 0.1;
             arg.open=strel('disk',50);
             arg.gauss=fspecial('gauss',75,25);
-            arg.cameraoffset = 100; 
+            arg.cameraoffset = 3841.4; 
             % will try to avoid saturation defined as pixel =0 (MM trick or
             % by the function handle in arg.saturation.
             arg.saturation = @(x) x>20000/2^16; % to disable use: @(x) false(size(x));
@@ -903,7 +933,7 @@ classdef (Abstract) Scope < handle
                     flt = nanmedian(stk,3);
             end
             if arg.filter
-                msk = flt>prctile(img(:),5);
+                msk = flt>prctile(img(:),2);
                 flt = imopen(flt,arg.open);
                 flt(~msk)=nan;
                 flt = imfilter(flt,arg.gauss,'symmetric');
@@ -945,7 +975,7 @@ classdef (Abstract) Scope < handle
             lbl = Scp.Chamber.Wells(mi);
         end
         
-        function err = goto(Scp,label,Pos,varargin)
+        function goto(Scp,label,Pos,varargin)
             
             Scp.TimeStamp = 'startmove';
             arg.plot = true;
@@ -1062,8 +1092,10 @@ classdef (Abstract) Scope < handle
             arg.pixelsize=Scp.PixelSize; 
             arg.cameratranspose = false; % false means that image colums are X stage, false it is Y
             arg.cameradirection=[1 1]; % when I move positive in X do the columns (row if transpose) move up or down
+            arg.camera_angle = Scp.CameraAngle;
             arg = parseVarargin(varargin,arg); 
-            rc=rc-[Scp.Width Scp.Height]/2;
+            rc=rc-[Scp.Height Scp.Width]/2;
+            rc = rc*[[cosd(arg.camera_angle), -1*sind(arg.camera_angle)]; [sind(arg.camera_angle), cosd(arg.camera_angle)]];
             if ~arg.cameratranspose
                 xy(1)=rc(2)*arg.pixelsize*arg.cameradirection(1)+arg.xy(1); 
                 xy(2)=rc(1)*arg.pixelsize*arg.cameradirection(2)+arg.xy(2);
@@ -1368,7 +1400,7 @@ classdef (Abstract) Scope < handle
             
             % allow for Z correction
             if arg.manualoverride
-                unqGroup=unique(Pos.Group);
+                unqGroup=unique(Pos.Group,'stable'); %added 'stable' to prevent flips
                 for i=1:numel(unqGroup)
                     Scp.goto(unqGroup{i});
                     Scp.whereami
@@ -1442,15 +1474,30 @@ classdef (Abstract) Scope < handle
         end
         
         function img=commandCameraToCapture(Scp)
-           if Scp.MMversion > 1.5                
+           if Scp.MMversion > 1.5 
                 Scp.mmc.snapImage;
                 timg=Scp.mmc.getTaggedImage;
                 img=timg.pix;
-            else
-                Scp.mmc.snapImage;
-                img = Scp.mmc.getImage;
-            end
+           else
+               try %added a try catch to *try* and fix the empty buffer issue.
+                   %trying this. AOY
+                   while Scp.mmc.getRemainingImageCount()
+                       Scp.mmc.popNextTaggedImage();
+                   end
+                   Scp.mmc.snapImage;
+                   img = Scp.mmc.getImage;
+               catch
+                   pause(.005);
+                   img = Scp.mmc.getImage;
+                   if isequal(img,Scp.lastImg)
+                     Scp.mmc.snapImage;
+                     img = Scp.mmc.getImage;
+                   end
+               end
+           end
+            Scp.lastImg = img;
             img=Scp.convertMMimgToMatlabFormat(img);
+            
             if Scp.CorrectFlatField
                 img = Scp.doFlatFieldCorrection(img);
             end
@@ -1717,7 +1764,7 @@ classdef (Abstract) Scope < handle
             % get full name of objective from shortcut
             avaliableObj = Scope.java2cell(Scp.mmc.getAllowedPropertyValues(Scp.DeviceNames.Objective,'Label'));
             label_10xnew = avaliableObj{6};
-            avaliableObj{6}='10Xnew';
+            avaliableObj{6}='20Xnew';
             % only consider Dry objectives for Scp.set.Objective
             objIx = cellfun(@(f) ~isempty(regexp(f,Objective, 'once')),avaliableObj) & cellfun(@(m) ~isempty(m),strfind(avaliableObj,'Dry'));
             if nnz(objIx)~=1
@@ -2019,7 +2066,7 @@ classdef (Abstract) Scope < handle
             clf
             
             Zinit = Scp.Z;
-            dZ = 35*(6.3/Scp.Optovar)^2;
+            dZ = 25*(6.3/Scp.Optovar)^2;
             sgn = 1;
 
             acc = dZ^(1/5);
@@ -2139,7 +2186,7 @@ classdef (Abstract) Scope < handle
             
             arg = parseVarargin(varargin,arg);
             
-            Scp.goto(Scp.Pos.Labels{1}, Scp.Pos)
+            Scp.goto(Scp.Pos.Labels{1}, Scp.Pos);
             figure(445)
             set(445,'Windowstyle','normal','toolbar','none','menubar','none','Position',[700 892 300 75],'Name','Please find focus in first well','NumberTitle','off')
             uicontrol(445,'Style', 'pushbutton', 'String','Done','Position',[50 20 200 35],'fontsize',13,'callback',@(~,~) close(445))
@@ -2149,7 +2196,7 @@ classdef (Abstract) Scope < handle
             Scp.Pos.List(:,3) = Scp.Mishor.Zpredict(Scp.Pos.List(:,1:2))+dZ1;
             ManualZ = Scp.Z;
             for i=1:Scp.Pos.N
-                Scp.goto(Scp.Pos.Labels{i}, Scp.Pos)
+                Scp.goto(Scp.Pos.Labels{i}, Scp.Pos);
                 Zfocus = Scp.ImageBasedFocusHillClimb(varargin{:});
                 if i==1
                     dZ = 0;%ManualZ-Zfocus;%difference bw what I call focus and what Mr. computer man thinks.

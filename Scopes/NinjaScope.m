@@ -1,7 +1,6 @@
 classdef NinjaScope < Scope
    
     properties
-       LaserVoltage = struct('name',{},'minV',[],'maxV',[]);
        OptovarStatus=[]; 
     end
     
@@ -15,6 +14,7 @@ classdef NinjaScope < Scope
             arg.mirrorpos = 'mirror'; %added by naomi 1/27/17
             arg.move=[]; % array of nx2 of position to move between in circular fashion. relative to current position in um
             arg.movetimes = [];
+            arg.objective = '20x';  % open
             arg.power=500; % percent
             arg = parseVarargin(varargin,arg);
             % switch time to seconds
@@ -31,6 +31,9 @@ classdef NinjaScope < Scope
             % timestamp
             Scp.TimeStamp='start_lightexposure';
             
+            %set objective
+            old_obj = Scp.Objective;
+            Scp.Objective = arg.objective;
             
             % decide based on ExcitationPosition which Shutter and Wheel to
             % use, two options are ExcitationWheel, LEDarray
@@ -49,29 +52,21 @@ classdef NinjaScope < Scope
                 PossArduinoSwitchPos{i}=char(str(i));
             end
             
-            PossDACdevices = {'Arduino-405DAC', 'Arduino-660DAC'};
-            %TODO read these automagically from MM (or not...)
             
             %Dirty but effective. Backwards compatibility.
-            if strcmp(ExcitationPosition,'405');
-                ExcitationPosition = 'Arduino-405DAC';
-            elseif strcmp(ExcitationPosition,'660');
-                ExcitationPosition = 'Arduino-660DAC';
-            end
+            %if strcmp(ExcitationPosition,'405');
+            %    ExcitationPosition = 'Arduino-405DAC';
+            %elseif strcmp(ExcitationPosition,'660');
+            %    ExcitationPosition = 'Arduino-660DAC';
+            %end
             
             
             if ismember(ExcitationPosition,PossExcitationWheelPos)
                 shutter = 'ExcitationShutter';
                 wheel = 'ExcitationWheel';
-                isDAC = false;
             elseif ismember(ExcitationPosition,PossArduinoSwitchPos)
                 shutter = '405LED';
                 wheel = 'Arduino-Switch';
-                isDAC = false;
-            elseif ismember(ExcitationPosition,PossDACdevices)
-                shutter = '405LED';
-                wheel = ExcitationPosition;
-                isDAC = true;
             else
                 error('Excitation position: %s does not exist in the system',ExcitationPosition)
             end
@@ -94,22 +89,9 @@ classdef NinjaScope < Scope
                 Scp.XY=arg.move(1,:);
             end
             %
-            if ~isDAC
-                Scp.mmc.setProperty(wheel,'Label',ExcitationPosition)
-                Scp.mmc.setShutterOpen(true);
-            else
-                % find which laser we are in
-                %                     Vrange = nan(2,1);
-                %                     Vrange(1)=Scp.LaserVoltage(ismember({Scp.LaserVoltage.name},ExcitationPosition)).minV;
-                %                     Vrange(2)=Scp.LaserVoltage(ismember({Scp.LaserVoltage.name},ExcitationPosition)).maxV;
-                %                     power = arg.power*range(Vrange)/100+Vrange(1);
-                
-                y = Scp.LaserVoltage(ismember({Scp.LaserVoltage.name},ExcitationPosition)).y;
-                x = Scp.LaserVoltage(ismember({Scp.LaserVoltage.name},ExcitationPosition)).x;
-                power = min(interp1(y,x,arg.power,[],'extrap'),5);
-                
-                Scp.mmc.setProperty(ExcitationPosition,'Volts',power)
-            end
+            Scp.mmc.setProperty(wheel,'Label',ExcitationPosition)
+            Scp.mmc.setShutterOpen(true);
+
             
             Tstart=now;
             if isempty(arg.move)
@@ -144,11 +126,8 @@ classdef NinjaScope < Scope
                     end
                 end
             end
-            if ~isDAC
-                Scp.mmc.setShutterOpen(false);
-            else
-                Scp.mmc.setProperty(ExcitationPosition,'Volts',0);
-            end
+            Scp.mmc.setShutterOpen(false);
+
             Texpose=(now-Tstart)*24*3600;
             if arg.cameraport
                 Scp.mmc.setProperty(Scp.DeviceNames.LightPath{1},Scp.DeviceNames.LightPath{2},Scp.DeviceNames.LightPath{3})
@@ -161,8 +140,10 @@ classdef NinjaScope < Scope
                 end
             end
             Scp.mmc.setProperty('Core','Shutter','ExcitationShutter')
+            Scp.Objective = old_obj;  % reset objective to its original position
             Scp.TimeStamp='end_lightexposure';
         end
+        
         
         function AcqData = optimizeChannelOrder(Scp,AcqData)
             % TODO: optimizeChannelOrder only optimzes filter wheels - need to add dichroics etc.
@@ -317,6 +298,20 @@ classdef NinjaScope < Scope
             Scp.OptovarStatus=Mag; 
         end
         
-        
+        function GUIPFS(Scp)
+            %%
+            figure(468)
+            set(468,'position',[400 600 300 50],'toolbar','none','dockcontrol','off','menubar','none','Name','AutoFocus','NumberTitle','off');
+            sliderpos=str2double(Scp.mmc.getProperty('TIPFSOffset','Position'));
+            h = uicontrol(468,'Style','slider','Min',0,'Max',1000,'Units','normalized','Value',sliderpos,'Position',[0 0 1 1],'SliderStep',[0.0001 0.001]);
+            addlistener(h,'Value','PostSet',@slidercallback);
+            
+            function slidercallback(~,~)
+                sliderpos = get(h,'Value');
+                Scp.mmc.setProperty('TIPFSOffset','Position',num2str(sliderpos))
+            end
+            
+        end
+
     end
 end
