@@ -108,6 +108,9 @@ classdef (Abstract) Scope < handle
         Optovar = 1;
         
         EnforcePlatingDensity = true;
+        
+        %% Live shift adjust
+        shiftfilepath =[];
                 
     end
     
@@ -309,6 +312,7 @@ classdef (Abstract) Scope < handle
                     Scp.snapSeqDatastore(Scp.pth,filename2ds,NFrames)
                     Scp.ZStage.Velocity = 10;
                     Scp.goto(Scp.Pos.peek,Scp.Pos);
+                    
                     filename = [filename filesep 'MMStack.ome.tif'];
                 else
                     if Scp.Pos.N>1
@@ -589,6 +593,9 @@ classdef (Abstract) Scope < handle
                 acqname = arg.acqname;
             end
             
+            if ~isempty(Scp.shiftfilepath)
+                Scp.initShiftFile
+            end
             
             if Scp.Strobbing
                 Scp.prepareProcessingFilesBefore(AcqData);
@@ -645,6 +652,41 @@ classdef (Abstract) Scope < handle
             end
             
             disp('I`m done now. Thank you.')
+        end
+        
+        function initShiftFile(Scp)
+            if ~isempty(Scp.shiftfilepath)
+                shiftfilename = fullfile(Scp.shiftfilepath,'shiftfile.txt');
+                fprintf('Init shift file at %s\n',shiftfilename); % still advance the position list
+                fid = fopen(shiftfilename, 'wt' );
+                fprintf( fid, '%s\n', 'dX=0');
+                fprintf( fid, '%s\n', 'dY=0');
+                fprintf( fid, '%s', 'dZ=0');
+                fclose(fid);
+            else
+                fprintf('Please add path to Scp.shiftfilepath\n')
+            end
+        end
+        function [dX,dY,dZ] = parseShiftFile(Scp)
+            shiftfilename = fullfile(Scp.shiftfilepath,'shiftfile.txt');
+            fid = fopen(shiftfilename, 'r' );
+            tline = fgetl(fid);
+            while ischar(tline)
+                [~,eind] = regexp(tline,'dX=');
+                if ~isempty(eind)
+                    dX = str2double(tline(eind+1:end));
+                end
+                [~,eind] = regexp(tline,'dY=');
+                if ~isempty(eind)
+                    dY = str2double(tline(eind+1:end));
+                end
+                [~,eind] = regexp(tline,'dZ=');
+                if ~isempty(eind)
+                    dZ = str2double(tline(eind+1:end));
+                end
+                tline = fgetl(fid);
+            end
+            fclose(fid);
         end
         
         function logError(Scp,msg,varargin)
@@ -749,6 +791,12 @@ classdef (Abstract) Scope < handle
                 %% goto position
                 Scp.goto(Scp.Pos.next,Scp.Pos);
                 
+                %% adjust position shift
+                [dX,dY,dZ] = parseShiftFile(Scp);
+                Scp.X = Scp.X+dX;
+                Scp.Y = Scp.Y+dY;
+                Scp.Z = Scp.Z+dZ;
+                
                 %% perfrom action
                 if iscell(func)
                     for i=1:numel(func)
@@ -792,6 +840,7 @@ classdef (Abstract) Scope < handle
                 
             end
         end
+ 
         
         function saveFlatFieldStack(Scp,varargin)
             response = questdlg('Do you really want to save FlatField to drive (it will override older FlatField data!!!','Warning - about to overwrite data');
@@ -902,7 +951,17 @@ classdef (Abstract) Scope < handle
             arg.plot = true;
             arg.single = true;
             arg.feature='';
+            arg.shiftfilepath = [];
             arg = parseVarargin(varargin,arg);
+            
+            if ~isempty(arg.shiftfilepath)
+                [dX,dY,dZ] = Scp.parseShiftFile(arg.shiftfilepath);
+            else
+                dX=0;
+                dY=0;
+                dZ=0;
+            end
+            
             
             if nargin==2 || isempty(Pos) % no position list provided
                 Pos  = Scp.createPositions('tmp',true,'prefix','');
@@ -953,9 +1012,11 @@ classdef (Abstract) Scope < handle
             if ifMulti
             label = label(1:ifMulti(1)-1);
             end
-            err =~strcmp(Scp.whereami,label); %return err=1 if end position doesnt match label
-            if err
-               warning('stage position doesn`t match label') 
+            if ~Scp.Strobbing
+                err =~strcmp(Scp.whereami,label); %return err=1 if end position doesnt match label
+                if err
+                    warning('stage position doesn`t match label')
+                end
             end
         end
         
