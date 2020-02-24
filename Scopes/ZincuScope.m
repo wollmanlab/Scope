@@ -195,5 +195,21 @@ classdef ZincuScope < Scope
             Scp.mmc.setProperty('Focus','Load Position',0);
         end
         
+        
+        
+        function setChannel(Scp,chnl)
+            turretState = str2double(Scp.mmc.getProperty('ZeissReflectorTurret','State'));
+            if ismember(turretState, [3, 4])
+                Scp.mmc.setProperty('ZeissReflectorTurret','State','0')
+                Scp.mmc.waitForDevice('ZeissReflectorTurret');
+            end
+            % figure out what dichroic we need and move there.
+            %Scp.ASI.moveASI('F',Scp.DichroicsPerChannel.(chnl));
+            
+            % set Em/Ex using MM
+            setChannel@Scope(Scp,chnl)
+            
+        end
+        
     end
 end

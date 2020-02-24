@@ -1476,34 +1476,42 @@ classdef (Abstract) Scope < handle
             
         end
         
-        function stk = snapSeq(Scp,nrFrames)
-            
-            %% init stk
-            stk=zeros([Scp.Height Scp.Width nrFrames],'single');
-            
-            %% Start seq acqusition
-            Scp.mmc.startSequenceAcquisition(nrFrames, 0, true);
-            
-            curFrame = 0;
-            while Scp.mmc.getRemainingImageCount() > 0 || Scp.mmc.isSequenceRunning(Scp.mmc.getCameraDevice())
-                
-                if Scp.mmc.getRemainingImageCount() > 0
-                    timg = Scp.mmc.popNextTaggedImage();
-                    img=Scp.convertMMimgToMatlabFormat(timg.pix);
-                    if Scp.CorrectFlatField
-                        img = Scp.doFlatFieldCorrection(img);
+        function stk = snapSeq(Scp,NFrames)            
+            timgs = cell(NFrames,1);
+            Scp.mmc.clearCircularBuffer()
+            Scp.mmc.startSequenceAcquisition(NFrames, 0, false);
+            frame = 0;
+            %exposureMs = Scp.Exposure;
+            while (Scp.mmc.getRemainingImageCount() > 0 || Scp.mmc.isSequenceRunning(Scp.mmc.getCameraDevice())) && frame<NFrames+1
+                if (Scp.mmc.getRemainingImageCount() > 0)
+                    Scp.mmc.getRemainingImageCount();
+                    if frame==0
+                        Scp.mmc.popNextTaggedImage();
+                        frame=frame+1;
+                    else
+                        timgs(frame) = Scp.mmc.popNextTaggedImage();
+                        frame=frame+1;
                     end
-                    curFrame=curFrame+1;
-                    stk(:,:,curFrame)=img;
                 else
-                    pause(0.01);
+                    Scp.mmc.sleep(2);
                 end
             end
             Scp.mmc.stopSequenceAcquisition();
-       
+            Scp.studio.closeAllAcquisitions;
+            
+            s = cellfun(@(x) Scp.convertMMimgToMatlabFormat(x.pix), timgs,'UniformOutput',false);
+            stk = cat(3,s{:});
+          
         end
         
         
+        function img = snapImageHDR(Scp,varargin)
+            N = ParseInputs('N',3,varargin);
+            Scp.Exposure = Scp.Exposure/N;
+            stk = Scp.snapSeq(N);
+            img = exposure_fusion_mono(cumsum(stk,3),[1 1]);
+            Scp.Exposure = Scp.Exposure*N;
+        end
         
         %% get/sets
         function set.Chamber(Scp,ChamberType)
@@ -2133,7 +2141,7 @@ classdef (Abstract) Scope < handle
 
             dZ1 = Scp.Z-Scp.Mishor.Zpredict(Scp.XY);
             Scp.Pos.List(:,3) = Scp.Mishor.Zpredict(Scp.Pos.List(:,1:2))+dZ1;
-            ManualZ = Scp.Z;
+            %ManualZ = Scp.Z;
             for i=1:Scp.Pos.N
                 Scp.goto(Scp.Pos.Labels{i}, Scp.Pos)
                 Zfocus = Scp.ImageBasedFocusHillClimb(varargin{:});
