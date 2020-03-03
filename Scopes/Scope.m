@@ -827,7 +827,7 @@ classdef (Abstract) Scope < handle
                 
                 
                 if ~isempty(Scp.shiftfilepath) %do this after the goto to not break adaptive positioning
-                    [dX,dY,dZ] = Scp.parseShiftFile(arg.shiftfilepath);
+                    [dX,dY,dZ] = Scp.parseShiftFile(Scp.shiftfilepath);
                 else
                     dX=0;
                     dY=0;
