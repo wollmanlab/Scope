@@ -219,8 +219,9 @@ classdef Plate < Chamber
                    P.x0y0 = []; %Has to be determined by Scope stage in ScopeStartup config file
                    P.directionXY = [1 1];
                    P.wellSpacingXY = [9000 8500]; 
-                   P.Wells = {  'TL'    'TR'  
-                                'BL'    'BR'};   
+                   P.Wells = {  'TL'    'TR'    'BL'    'BR'};
+                            
+ 
                case 'Evans PDMS'
                    P.numOfsubChambers=1; 
                    P.type = type;
@@ -231,6 +232,7 @@ classdef Plate < Chamber
                    P.directionXY = [-1 1];
                    P.wellSpacingXY = [0 0]; 
                    P.Wells = {'CR'}; 
+                   
                case 'Labtek 8-wells'
                    P.numOfsubChambers=8; 
                    P.type = type;
