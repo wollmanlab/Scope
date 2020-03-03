@@ -317,6 +317,10 @@ classdef (Abstract) Scope < handle
                     Scp.snapSeqDatastore(Scp.pth,filename2ds,NFrames)
                     Scp.ZStage.Velocity = 10;
                     Scp.goto(Scp.Pos.peek,Scp.Pos);
+                    [dX,dY,dZ] = parseShiftFile(Scp);
+                    Scp.X = Scp.X+dX;
+                    Scp.Y = Scp.Y+dY;
+                    Scp.Z = Scp.Z+dZ;
                     
                     filename = [filename filesep 'MMStack.ome.tif'];
                 else
