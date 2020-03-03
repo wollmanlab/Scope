@@ -44,6 +44,8 @@ classdef (Abstract) Scope < handle
                             % 'none' - skips image show, only works with MM 2.0 and above
         acqsave = true;
         
+        %%
+        plotPlate = true;
 
         %% image size properties
         Width
@@ -822,7 +824,16 @@ classdef (Abstract) Scope < handle
                 Scp.goto(Scp.Pos.next,Scp.Pos);
                 
                 %% adjust position shift
-                [dX,dY,dZ] = parseShiftFile(Scp);
+                
+                
+                if ~isempty(Scp.shiftfilepath) %do this after the goto to not break adaptive positioning
+                    [dX,dY,dZ] = Scp.parseShiftFile(arg.shiftfilepath);
+                else
+                    dX=0;
+                    dY=0;
+                    dZ=0;
+                end
+                
                 Scp.X = Scp.X+dX;
                 Scp.Y = Scp.Y+dY;
                 Scp.Z = Scp.Z+dZ;
@@ -978,19 +989,11 @@ classdef (Abstract) Scope < handle
         function goto(Scp,label,Pos,varargin)
             
             Scp.TimeStamp = 'startmove';
-            arg.plot = true;
+            arg.plot = Scp.plotPlate;
             arg.single = true;
             arg.feature='';
-            arg.shiftfilepath = [];
             arg = parseVarargin(varargin,arg);
-            
-            if ~isempty(arg.shiftfilepath)
-                [dX,dY,dZ] = Scp.parseShiftFile(arg.shiftfilepath);
-            else
-                dX=0;
-                dY=0;
-                dZ=0;
-            end
+
             
             
             if nargin==2 || isempty(Pos) % no position list provided
@@ -1570,7 +1573,8 @@ classdef (Abstract) Scope < handle
             N = ParseInputs('N',3,varargin);
             Scp.Exposure = Scp.Exposure/N;
             stk = Scp.snapSeq(N);
-            img = exposure_fusion_mono(cumsum(stk,3),[1 1]);
+           % img = exposure_fusion_mono(cumsum(stk,3),[1 1]);
+            img = blendstk(cumsum(stk,3));
             Scp.Exposure = Scp.Exposure*N;
         end
         

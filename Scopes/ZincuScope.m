@@ -36,7 +36,7 @@ classdef ZincuScope < Scope
                 end
                 single = false;
             end
-             err = goto@Scope(Scp,label,Pos,varargin);
+             goto@Scope(Scp,label,Pos,varargin);
 %             if err
 %                 warning('resetting stage')
 %                 Scp.mmc.setProperty('Focus','Load Position',1);
@@ -160,7 +160,7 @@ classdef ZincuScope < Scope
             clf;
             set(468,'position',[400 600 50 300],'color','w','toolbar','none','dockcontrol','off','menubar','none','Name','Z','NumberTitle','off');
             sliderpos=str2double(Scp.mmc.getProperty('Focus','Position'));
-            h = uicontrol(468,'Style','slider','Min',-10000,'Max',5000,'Units','normalized','String','Z','Value',sliderpos,'Position',[0.35 0 0.65 1],'SliderStep',[5/15000 50/15000]);
+            h = uicontrol(468,'Style','slider','Min',-200,'Max',20000,'Units','normalized','String','Z','Value',sliderpos,'Position',[0.35 0 0.65 1],'SliderStep',[5/15000 50/15000]);
             addlistener(h,'Value','PostSet',@slidercallback);
             h.BackgroundColor='w'; 
             
