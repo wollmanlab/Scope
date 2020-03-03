@@ -319,6 +319,10 @@ classdef (Abstract) Scope < handle
                     Scp.snapSeqDatastore(Scp.pth,filename2ds,NFrames)
                     Scp.ZStage.Velocity = 10;
                     Scp.goto(Scp.Pos.peek,Scp.Pos);
+                    [dX,dY,dZ] = parseShiftFile(Scp);
+                    Scp.X = Scp.X+dX;
+                    Scp.Y = Scp.Y+dY;
+                    Scp.Z = Scp.Z+dZ;
                     
                     filename = [filename filesep 'MMStack.ome.tif'];
                 else
@@ -700,25 +704,31 @@ classdef (Abstract) Scope < handle
             end
         end
         function [dX,dY,dZ] = parseShiftFile(Scp)
-            shiftfilename = fullfile(Scp.shiftfilepath,'shiftfile.txt');
-            fid = fopen(shiftfilename, 'r' );
-            tline = fgetl(fid);
-            while ischar(tline)
-                [~,eind] = regexp(tline,'dX=');
-                if ~isempty(eind)
-                    dX = str2double(tline(eind+1:end));
-                end
-                [~,eind] = regexp(tline,'dY=');
-                if ~isempty(eind)
-                    dY = str2double(tline(eind+1:end));
-                end
-                [~,eind] = regexp(tline,'dZ=');
-                if ~isempty(eind)
-                    dZ = str2double(tline(eind+1:end));
-                end
+            if ~isempty(Scp.shiftfilepath)
+                shiftfilename = fullfile(Scp.shiftfilepath,'shiftfile.txt');
+                fid = fopen(shiftfilename, 'r' );
                 tline = fgetl(fid);
+                while ischar(tline)
+                    [~,eind] = regexp(tline,'dX=');
+                    if ~isempty(eind)
+                        dX = str2double(tline(eind+1:end));
+                    end
+                    [~,eind] = regexp(tline,'dY=');
+                    if ~isempty(eind)
+                        dY = str2double(tline(eind+1:end));
+                    end
+                    [~,eind] = regexp(tline,'dZ=');
+                    if ~isempty(eind)
+                        dZ = str2double(tline(eind+1:end));
+                    end
+                    tline = fgetl(fid);
+                end
+                fclose(fid);
+            else
+                dX=0;
+                dY=0;
+                dZ=0;
             end
-            fclose(fid);
         end
         
         function logError(Scp,msg,varargin)
@@ -826,14 +836,8 @@ classdef (Abstract) Scope < handle
                 %% adjust position shift
                 
                 
-                if ~isempty(Scp.shiftfilepath) %do this after the goto to not break adaptive positioning
-                    [dX,dY,dZ] = Scp.parseShiftFile(Scp.shiftfilepath);
-                else
-                    dX=0;
-                    dY=0;
-                    dZ=0;
-                end
-                
+
+                [dX,dY,dZ] = Scp.parseShiftFile(Scp.shiftfilepath);        
                 Scp.X = Scp.X+dX;
                 Scp.Y = Scp.Y+dY;
                 Scp.Z = Scp.Z+dZ;
