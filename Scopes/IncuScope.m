@@ -9,6 +9,7 @@ classdef IncuScope < Scope
         ASI = ASIcontroller;
         DichroicsPerChannel;
         Mishor;
+        Stepsize = 4;
     end
     
     %% Methods
@@ -80,13 +81,13 @@ classdef IncuScope < Scope
         %             % XY axis are fli
         function setX(Scp,X)
             %                 Scp.ASI.moveASI('Y',X);
-            Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,Scp.Y,X)
+            Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,Scp.Y/Scp.Stepsize,X/Scp.Stepsize)
             Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
         end
         %
         function setY(Scp,Y)
             %                 Scp.ASI.moveASI('X',Y);
-            Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,Y,Scp.X)
+            Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,Y/Scp.Stepsize,Scp.X/Scp.Stepsize)
             Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
         end
         %
@@ -98,11 +99,11 @@ classdef IncuScope < Scope
         %
         function X=getX(Scp)
             %                 X = Scp.ASI.whereAmI('Y');
-            X=Scp.mmc.getYPosition(Scp.mmc.getXYStageDevice);
+            X=Scp.mmc.getYPosition(Scp.mmc.getXYStageDevice)*Scp.Stepsize;
             %
         end
         function Y=getY(Scp)
-            Y=Scp.mmc.getXPosition(Scp.mmc.getXYStageDevice);
+            Y=Scp.mmc.getXPosition(Scp.mmc.getXYStageDevice)*Scp.Stepsize;
             %                  Y = Scp.ASI.whereAmI('X');
         end
         %
@@ -121,7 +122,7 @@ classdef IncuScope < Scope
             %                 Scp.ASI.moveASI('XY',XY([2,1]));
             %                 %Scp.setX(XY(1));
             %                 %Scp.setY(XY(2));
-            Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(2),XY(1))
+            Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(2)/Scp.Stepsize,XY(1)/Scp.Stepsize)
             Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
         end
         
@@ -294,6 +295,10 @@ classdef IncuScope < Scope
         %                 end
         %             end
         %
-        
+        function lbl = whereami(Scp)
+            d=distance(Scp.XY',[Scp.Chamber.Xcenter(:) Scp.Chamber.Ycenter(:)]');
+            [~,mi]=min(d);
+            lbl = Scp.Chamber.Wells(mi);
+        end
     end
 end

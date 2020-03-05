@@ -1500,7 +1500,7 @@ classdef (Abstract) Scope < handle
                 end
             end
             Scp.mmc.stopSequenceAcquisition();
-       
+            Scp.studio.closeAllAcquisitions;
         end
         
         
