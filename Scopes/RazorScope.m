@@ -26,7 +26,7 @@ classdef RazorScope < Scope
         end
         
         function Objective = getObjective(Scp)
-            Objective = 'You Guys miss Yanfei, yet?, yes we do....';
+            Objective = 'Nikon CFI 16X 0.8NA';
         end
         
         function PixelSize = getPixelSize(Scp)
@@ -72,6 +72,47 @@ classdef RazorScope < Scope
             goto@Scope(Scp,label,Pos,'plot',false)
         end
         
+        
+        
+        
+        function setChannel(Scp,chnl)
+            
+            %% do some input checking
+            % is char
+            if ~ischar(chnl)
+                error('Channel state must be char!');
+            end
+            
+            %% check if change is needed, if not return
+            if strcmp(chnl,Scp.Channel)
+                return
+            end
+            
+            %% Change channel
+            % the try-catch is a legacy from a hardware failure where
+            % the scope wasn't changing on time and we had to wait
+            % longer for it to do so. We decided to keep it in there
+            % since it doesn't do any harm to try changing channel
+            % twice with a warning done message
+            try
+                Scp.mmc.setConfig(Scp.mmc.getChannelGroup,chnl);
+                Scp.mmc.waitForSystem();
+                assert(~isempty(Scp.Channel),'error - change channel failed');
+            catch e
+                fprintf('failed for the first time with error message %s, trying again\n',e.message)
+                Scp.mmc.setProperty('Emission','State',0);
+                Scp.mmc.waitForSystem();
+                Scp.mmc.setConfig(Scp.mmc.getChannelGroup,chnl);
+                Scp.mmc.waitForSystem();
+                disp('done')
+            end
+            
+            %% update GUI if not in timeCrunchMode
+            if ~Scp.reduceAllOverheadForSpeed
+                Scp.studio.refreshGUI;
+            end
+        end
+        
         %         function img=commandCameraToCapture(Scp)
         %             if ischar(Scp.Camera) && strcmp(Scp.Camera,'Zyla')
         %                 img = commandCameraToCapture@Scope(Scp);
@@ -109,22 +150,28 @@ classdef RazorScope < Scope
             refImgInd = ind;
             Scp.Channel = AcqData(1).Channel;
             Scp.goto(Scp.Pos.Labels{refImgInd}, Scp.Pos); %go to first position
-            Scp.refImage = Scp.snapImage;%snap an image
+            ref = Scp.snapImage;
+            [ref,~] = perdecomp(ref);
+            Scp.refImage = ref;%snap an image
         end
         
-        function ref = DriftAdjust(Scp,AcqData, ind)
+        function DriftAdjust(Scp,AcqData, ind)
             refImgInd = ind;
             ref = Scp.refImage;
             Scp.Channel = AcqData(1).Channel;
             Scp.goto(Scp.Pos.Labels{refImgInd}, Scp.Pos); %go to first position
             
             img = Scp.snapImage;%snap an image
+            [img,~] = perdecomp(img); %nonlazy way of dealing with cross
             imXcorr = convnfft(ref-mean(ref(:)),rot90(img,2)-mean(img(:)),'same');%compare image to input ref
-            imXcorr(size(img,1)/2, size(img,2)/2) =imXcorr(size(img,1)/2-1, size(img,2)/2-1) ; %lazy way to avoid cross artifact
+            imXcorr(size(img,1)/2, size(img,2)/2) =imXcorr(size(img,1)/2-1, size(img,2)/2-1) ; %lazy way to avoid point artifact
             [maxY, maxX] = find(imXcorr == max(imXcorr(:)));%find displacement
             
             dY = maxY-size(img,1)/2;
             dX = maxX-size(img,2)/2;
+                        
+            dY = dY(1);
+            dX = dX(1);
             
             dy1 = dY;
             dx1 = dX;
@@ -134,21 +181,26 @@ classdef RazorScope < Scope
             Scp.goto(Scp.Pos.Labels{refImgInd}, Scp.Pos); %take new ref for next r0und
             
             img = Scp.snapImage;%snap an image
+            [img,~] = perdecomp(img); %nonlazy way of dealing with cross
             imXcorr = convnfft(ref-mean(ref(:)),rot90(img,2)-mean(img(:)),'same');%compare image to input ref
-            imXcorr(size(img,1)/2, size(img,2)/2) =imXcorr(size(img,1)/2-1, size(img,2)/2-1) ; %lazy way to avoid cross artifact
+            imXcorr(size(img,1)/2, size(img,2)/2) =imXcorr(size(img,1)/2-1, size(img,2)/2-1) ; %lazy way to avoid point artifact
             [maxY, maxX] = find(imXcorr == max(imXcorr(:)));%find displacement
             
             dY = maxY-size(img,1)/2;
             dX = maxX-size(img,2)/2;
             
-            dy1 = dy1+dY
-            dx1 = dx1+dX
+            
+            dY = dY(1)
+            dX = dX(1)
+            
+            dy1 = dy1+dY;
+            dx1 = dx1+dX;
             
             Scp.Pos.List(:,1) = Scp.Pos.List(:,1)-dX; %update position list
             Scp.Pos.List(:,2) = Scp.Pos.List(:,2)-dY; %update position list
-            Scp.goto(Scp.Pos.Labels{refImgInd}, Scp.Pos); %take new ref for next r0und
+            Scp.goto(Scp.Pos.Labels{refImgInd}, Scp.Pos); 
             
-            ref = Scp.snapImage;
+            %ref = Scp.snapImage;
         end
         
         %
@@ -373,7 +425,7 @@ classdef RazorScope < Scope
             end
             ExpData= struct('nFrames', num2cell(frmVec),'dz',num2cell(repmat(dZ,1,size(Pos.List,1))),'Tile',Tiles);
             
-            %Pos.ExperimentMetadata = ExpData;
+            Pos.ExperimentMetadata = ExpData;
             
             %Scp.Pos = Pos;
         end
@@ -948,6 +1000,8 @@ classdef RazorScope < Scope
             fprintf( fid, '%s\n', 'ICPjobs_export="/Processing/ICPjobs"');
             fprintf( fid, '%s\n', 'Multiviewjobs_export="/Processing/multiviewjobs"');
             fprintf( fid, '%s\n', 'Stabilizejobs_export="/Processing/stabilizejobs"');
+            fprintf( fid, '%s\n', 'Finalrefinejobs_export="/Processing/finalrefinejobs"');
+            
             fprintf( fid, '%s\n', 'fusejobs_export="/Processing/fusejobs"');
             fprintf( fid, '%s\n\n', 'fused_dir="/Fused"');
             
@@ -1065,7 +1119,7 @@ classdef RazorScope < Scope
             fprintf( fid, 'save and close Fiji.\n\n' );
             fprintf( fid, 'We align iteratively by inhereting all the previous transformations.\n\n' );
             %fprintf( fid, 'cd "%s"\n', repoDir);
-            fprintf( fid, '%s/multiviewReconstructionPropagate.sh "%s"\n\n',repoDir, MasterFileNameOnAnalysisBox);
+            fprintf( fid, '%s/MultiviewReconstruct.sh "%s"\n\n',repoDir, MasterFileNameOnAnalysisBox);
             %fprintf( fid, '%s/Processing/multiviewjobs/MultiviewProp.job\n\n', FullPathSetsOnAnalysisBox);
             
 
@@ -1073,6 +1127,7 @@ classdef RazorScope < Scope
             fprintf( fid, 'Fix drift.\n\n' );
             fprintf( fid, '%s/driftCorrection.sh "%s"\n\n', repoDir, MasterFileNameOnAnalysisBox);
             %fprintf( fid, '%s/Processing/stabilizejobs/commands.sh\n\n', FullPathSetsOnAnalysisBox);
+            fprintf( fid, '%s/finalRefinement.sh "%s"\n\n', repoDir, MasterFileNameOnAnalysisBox);
             
             
             fprintf( fid, 'Finally, fuse dataset.\n\n' );
