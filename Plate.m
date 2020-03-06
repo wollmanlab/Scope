@@ -226,8 +226,8 @@ classdef Plate < Chamber
                    P.type = type;
                    P.sz = [1 1];
                    P.wellCurvature = [1 1];
-                   P.x0y0 = [-5462         939]; % change (center)
-                   P.wellDimensions=abs([-2625       -1989]-[-8299        3867]); % (top left - bot right)
+                   P.x0y0 = [2212    768]; % change (center)
+                   P.wellDimensions=abs([6046       -2696]-[-1622        4233]); % (top left - bot right)
                    P.directionXY = [-1 1];
                    P.wellSpacingXY = [0 0]; 
                    P.Wells = {'CR'}; 
