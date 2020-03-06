@@ -929,7 +929,7 @@ classdef (Abstract) Scope < handle
         function goto(Scp,label,Pos,varargin)
             
             Scp.TimeStamp = 'startmove';
-            arg.plot = true;
+            arg.plot = false;
             arg.single = true;
             arg.feature='';
             arg = parseVarargin(varargin,arg);

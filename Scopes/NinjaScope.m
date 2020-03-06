@@ -312,6 +312,12 @@ classdef NinjaScope < Scope
             end
             
         end
+        
+%         function img = snapImage(Scp)
+%             img = snapImage@Scope(Scp);
+%             img = flipud(img);
+%             img = fliplr(img);
+%         end
 
     end
 end
