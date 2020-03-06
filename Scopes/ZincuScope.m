@@ -36,7 +36,7 @@ classdef ZincuScope < Scope
                 end
                 single = false;
             end
-             err = goto@Scope(Scp,label,Pos,varargin);
+             goto@Scope(Scp,label,Pos,varargin);
 %             if err
 %                 warning('resetting stage')
 %                 Scp.mmc.setProperty('Focus','Load Position',1);
@@ -160,7 +160,7 @@ classdef ZincuScope < Scope
             clf;
             set(468,'position',[400 600 50 300],'color','w','toolbar','none','dockcontrol','off','menubar','none','Name','Z','NumberTitle','off');
             sliderpos=str2double(Scp.mmc.getProperty('Focus','Position'));
-            h = uicontrol(468,'Style','slider','Min',-10000,'Max',5000,'Units','normalized','String','Z','Value',sliderpos,'Position',[0.35 0 0.65 1],'SliderStep',[5/15000 50/15000]);
+            h = uicontrol(468,'Style','slider','Min',-200,'Max',20000,'Units','normalized','String','Z','Value',sliderpos,'Position',[0.35 0 0.65 1],'SliderStep',[5/15000 50/15000]);
             addlistener(h,'Value','PostSet',@slidercallback);
             h.BackgroundColor='w'; 
             
@@ -193,6 +193,22 @@ classdef ZincuScope < Scope
             Scp.Chamber.directionXY = [1 1];
             Scp.reduceAllOverheadForSpeed=true;
             Scp.mmc.setProperty('Focus','Load Position',0);
+        end
+        
+        
+        
+        function setChannel(Scp,chnl)
+            turretState = str2double(Scp.mmc.getProperty('ZeissReflectorTurret','State'));
+            if ismember(turretState, [3, 4])
+                Scp.mmc.setProperty('ZeissReflectorTurret','State','0')
+                Scp.mmc.waitForDevice('ZeissReflectorTurret');
+            end
+            % figure out what dichroic we need and move there.
+            %Scp.ASI.moveASI('F',Scp.DichroicsPerChannel.(chnl));
+            
+            % set Em/Ex using MM
+            setChannel@Scope(Scp,chnl)
+            
         end
         
     end
