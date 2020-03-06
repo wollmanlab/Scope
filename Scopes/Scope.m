@@ -837,7 +837,7 @@ classdef (Abstract) Scope < handle
                 
                 
 
-                [dX,dY,dZ] = Scp.parseShiftFile(Scp.shiftfilepath);        
+                [dX,dY,dZ] = Scp.parseShiftFile;        
                 Scp.X = Scp.X+dX;
                 Scp.Y = Scp.Y+dY;
                 Scp.Z = Scp.Z+dZ;
