@@ -1566,7 +1566,7 @@ classdef (Abstract) Scope < handle
             end
             Scp.mmc.stopSequenceAcquisition();
             Scp.studio.closeAllAcquisitions;
-            
+  
             s = cellfun(@(x) Scp.convertMMimgToMatlabFormat(x.pix), timgs,'UniformOutput',false);
             stk = cat(3,s{:});
           
