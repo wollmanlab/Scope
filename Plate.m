@@ -95,6 +95,7 @@ classdef Plate < Chamber
                                 'C01'    'C02'    'C03'    'C04'    'C05'    'C06'
                                 'D01'    'D02'    'D03'    'D04'    'D05'    'D06'};   
                case 'Costar12 (3513)'
+                   % cells in focus at 4416 um
                    P.numOfsubChambers=12; 
                    P.type = type;
                    P.sz = [3 4];

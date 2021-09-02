@@ -12,7 +12,7 @@ classdef RelativePositions < Positions
         function addRefPointsFromImage(Pos,Scp,Labels,varargin)
             arg.channel='Brightfield'; 
             arg.cameradirection = [1 1];
-            arg.pixelsize = Scp.PixelSize;
+            arg.pixelsize = Scp.PixelSize; % nee to give pixelsie as arg
             arg.exposure = 75; 
             arg.cameradirection = [1 -1];
             arg.pixelsize = Scp.PixelSize;
