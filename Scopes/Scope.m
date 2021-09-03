@@ -23,7 +23,6 @@ classdef (Abstract) Scope < handle
         ObjectiveOffsets
         CameraAngle = 0;
         
-        
         %%
         lastImg;
         
@@ -46,7 +45,7 @@ classdef (Abstract) Scope < handle
         
         %%
         plotPlate = true;
-
+        
         %% image size properties
         Width
         Height
@@ -81,7 +80,6 @@ classdef (Abstract) Scope < handle
         AutoFocusType = 'Hardware'; % Software / Hardware / DefiniteFocus / None
         autogrid=10;
         AFparam=struct('scale',2,'resize',1,'channel','DeepBlue','exposure',10); 
-        
         AFgrid
         AFscr
         AFlog=struct('Time',[],'Z',[],'Score',[],'Channel','','Type','');
@@ -167,6 +165,8 @@ classdef (Abstract) Scope < handle
             disp('starting z stack')
             % acqZstack acquires a whole Z stack
             arg.channelfirst = true; % if True will acq multiple channels per Z movement.
+            arg.autoshutter = true; 
+            %arg.delay = false;
             % False will acq a Z stack per color.
             arg = parseVarargin(varargin,arg);
             Z0 = Scp.Z;
@@ -183,9 +183,22 @@ classdef (Abstract) Scope < handle
                 end
             else % per color acquire a Z stack
                 for j=1:numel(AcqData)
+                    if arg.autoshutter == false
+                        Scp.mmc.setAutoShutter(0);
+                        Scp.Channel = AcqData(j).Channel;
+                        Scp.mmc.setShutterOpen(1);
+                        D0 = AcqData(j).Delay;
+                        pause(AcqData(j).Delay*(1/1000));
+                        AcqData(j).Delay = 0;
+                    end
                     for i=1:numel(dZ)
                         Scp.Z=Z0+dZ(i);
                         acqFrame(Scp,AcqData(j),acqname,'z',i,'savemetadata',false);
+                    end
+                    if arg.autoshutter == false
+                        Scp.mmc.setAutoShutter(1);
+                        Scp.mmc.setShutterOpen(0);
+                        AcqData(j).Delay = D0;
                     end
                 end
             end
@@ -226,6 +239,7 @@ classdef (Abstract) Scope < handle
             
             % autofocus function depends on scope settings
             Scp.TimeStamp = 'before_focus';
+            
             Scp.autofocus;
             Scp.TimeStamp = 'after_focus';
             %% Make sure I'm using the right MD
@@ -288,6 +302,7 @@ classdef (Abstract) Scope < handle
                 else %spim specific
                     filename = sprintf('img_%s_%03g_Ch%d_000.tif',poslabel,Scp.FrameCount(p)-1,i);
                 end
+                
                 if Scp.Pos.N>1 && ~Scp.Strobbing % add position folder
                     filename =  fullfile(sprintf('Pos%g',p-1),filename);
                 end
@@ -309,8 +324,9 @@ classdef (Abstract) Scope < handle
                 %% Snap image / or pull from camera seq
                 % proceed differ whether we are using MM to show the stack
                 if Scp.Strobbing
+                    filename = fullfile(Scp.pth,acqname,filename); 
                     filename = filename(1:end-4); % remote .tiff
-                    filename2ds = fullfile(acqname,filename); 
+                    filename2ds = fullfile(acqname,filename);
                     NFrames = Scp.Pos.ExperimentMetadata(Scp.Pos.current).nFrames;
                     dz = Scp.Pos.ExperimentMetadata(Scp.Pos.current).dz;
                     Scp.ZStage.Velocity = Scp.imagingVelocity;%Scp.imagingVelocity;
@@ -338,6 +354,19 @@ classdef (Abstract) Scope < handle
                     if TriggeredChannels(i)
                         % replace all part till else with indexing from stk.
                         img=stk(:,:,i);
+                    elseif AcqData(i).Delay>0
+                        % Set Auto Shutter Off
+                        Scp.mmc.setAutoShutter(0);
+                        % Open Shutter (Auto Shutter must be off)
+                        Scp.mmc.setShutterOpen(1);
+                        % Delay to account for shutter opening
+                        pause(AcqData(i).Delay*0.001)
+                        % Acquire Image
+                        img = Scp.snapImage;
+                        % Close Shutter
+                        Scp.mmc.setShutterOpen(0);
+                        % Set Auto Shutter Off
+                        Scp.mmc.setAutoShutter(1);
                     else 
                         img = Scp.snapImage;
                     end
@@ -366,9 +395,13 @@ classdef (Abstract) Scope < handle
                 
                 %% deal with metadata of scope parameters
                 if isempty(arg.refposname)
-
-                    grp = Scp.Pos.peek('group',true); % the position group name, e.g. the well
-                    pos = Scp.Pos.peek; 
+                    if class(Scp,'HypeScope')
+                        pos = Scp.Pos.peek;
+                        grp = pos; %hypescope hack
+                    else
+                        grp = Scp.Pos.peek('group',true); % the position group name, e.g. the well
+                    end
+                                      
                 else
                     grp = 'RefPoints'; 
                     pos = arg.refposname; 
@@ -455,9 +488,8 @@ classdef (Abstract) Scope < handle
             for i=1:numel(AcqData)
                 Scp.Channel=AcqData(i).Channel;
                 Scp.Exposure=AcqData(i).Exposure;
-                % use createFlatFieldImage with defaults beside increase
-                % iterations
-                flt = createFlatFieldImage(Scp,'filter',true,'iter',30,'assign',true,'meanormedian','mean','gauss', fspecial('gauss',30,3));
+                %                 flt = createFlatFieldImage(Scp,'filter',true,'iter',5,'assign',true);
+                flt = createFlatFieldImage(Scp,'filter',true,'iter',5,'assign',true,'meanormedian','median','xymove',0.1,'open',strel('disk',250),'gauss',fspecial('gauss',150,75));
                 Scp.snapImage;
                 figure(321)
                 imagesc(flt);
@@ -472,7 +504,6 @@ classdef (Abstract) Scope < handle
                 
             end
         end
-        
         
         function saveFlatFieldsInPlace(Scp,AcqData)
             for i=1:numel(AcqData)
@@ -494,8 +525,6 @@ classdef (Abstract) Scope < handle
             end
         end
         
-        
-        
         % get the flat field for current configuration
         function flt = getFlatFieldImage(Scp,varargin)
             
@@ -516,13 +545,13 @@ classdef (Abstract) Scope < handle
                 warning('Flat field failed with channel %s, error message %s, moving on...',Scp.Channel,e.message);
                 flt=ones([Scp.Width Scp.Height]);
             end
-            flt = flt';
         end
         
         function  img = doFlatFieldCorrection(Scp,img,varargin)
             arg.offset = 100; 
             arg.percenttozeros = 0.05; 
             arg = parseVarargin(varargin,arg); 
+            
             flt = getFlatFieldImage(Scp,varargin);
             img = (img-arg.offset/2^Scp.BitDepth)./flt+arg.offset/2^Scp.BitDepth;
             img(flt<arg.percenttozeros) = prctile(img(unidrnd(numel(img),10000,1)),1); % to save time, look at random 10K pixels and not all of them...
@@ -618,6 +647,8 @@ classdef (Abstract) Scope < handle
             arg.channelfirst = true; % used for Z stack
             arg.dooncepertimepoint = {};
             arg.calibrate = false;
+            arg.autoshutter = true;
+            %arg.delay = false;
             arg = parseVarargin(varargin,arg);
             
             
@@ -648,7 +679,6 @@ classdef (Abstract) Scope < handle
                     flt = getFlatFieldImage(Scp);
                     filename = sprintf('flt_%s.tif',Scp.CurrentFlatFieldConfig);
                 catch
-                    warning('Flat field failed with channel %s, error message %s, moving on...',Scp.Channel,e.message);
                     flt=ones([Scp.Height Scp.Width]);
                     filename=sprintf('flt_%s.tif',AcqData(i).Channel);
                 end
@@ -666,7 +696,7 @@ classdef (Abstract) Scope < handle
                     if arg.calibrate
                         arg.func = @() acqZcalibration(Scp, AcqData, acqname, arg.dz, 'channelfirst', arg.channelfirst);
                     else
-                        arg.func = @() acqZstack(Scp,AcqData,acqname,arg.dz,'channelfirst',arg.channelfirst);
+                        arg.func = @() acqZstack(Scp,AcqData,acqname,arg.dz,'channelfirst',arg.channelfirst,'autoshutter',arg.autoshutter);
                     end
                 end
             end
@@ -687,10 +717,10 @@ classdef (Abstract) Scope < handle
                 Scp.MD.saveMetadata(fullfile(Scp.pth,acqname));
             end
             
-            disp('I`m done now. Thank you.')
+            
         end
         
-        function initShiftFile(Scp)
+         function initShiftFile(Scp)
             if ~isempty(Scp.shiftfilepath)
                 shiftfilename = fullfile(Scp.shiftfilepath,'shiftfile.txt');
                 fprintf('Init shift file at %s\n',shiftfilename); % still advance the position list
@@ -729,6 +759,7 @@ classdef (Abstract) Scope < handle
                 dY=0;
                 dZ=0;
             end
+            
         end
         
         function logError(Scp,msg,varargin)
@@ -792,11 +823,11 @@ classdef (Abstract) Scope < handle
         end
         
         function AcqData = optimizeChannelOrder(Scp,AcqData)  %#ok<INUSD>
-             warning('Not implemented in Scope - overload to use!')
+             error('Not implemented in Scope - overload to use!')
         end
         
-        function [z,s]=autofocus(Scp) %#ok<STOUT,INUSD>
-            warning('Not implemented in Scope - overload to use!')
+        function [z,s]=autofocus(Scp,AcqData) %#ok<STOUT,INUSD>
+            error('Not implemented in Scope - overload to use!')
         end
         
         %% Accesory functions
@@ -830,17 +861,14 @@ classdef (Abstract) Scope < handle
                     continue %skip the goto and func calls
                 end
                 
-                %% goto position
-                Scp.goto(Scp.Pos.next,Scp.Pos);
-                
                 %% adjust position shift
-                
-                
-
                 [dX,dY,dZ] = Scp.parseShiftFile;        
                 Scp.X = Scp.X+dX;
                 Scp.Y = Scp.Y+dY;
                 Scp.Z = Scp.Z+dZ;
+                
+                %% goto position
+                Scp.goto(Scp.Pos.next,Scp.Pos);
                 
                 %% perfrom action
                 if iscell(func)
@@ -885,7 +913,6 @@ classdef (Abstract) Scope < handle
                 
             end
         end
- 
         
         function saveFlatFieldStack(Scp,varargin)
             response = questdlg('Do you really want to save FlatField to drive (it will override older FlatField data!!!','Warning - about to overwrite data');
@@ -918,6 +945,8 @@ classdef (Abstract) Scope < handle
             arg.saturation = @(x) x>20000/2^16; % to disable use: @(x) false(size(x));
             arg = parseVarargin(varargin,arg);
             
+            Scp.CorrectFlatField = 0;
+            
             XY0 = Scp.XY;
             
             Scp.Channel = arg.channel;
@@ -948,7 +977,7 @@ classdef (Abstract) Scope < handle
                     flt = nanmedian(stk,3);
             end
             if arg.filter
-                msk = flt>prctile(img(:),2);
+                msk = flt>prctile(img(:),5);
                 flt = imopen(flt,arg.open);
                 flt(~msk)=nan;
                 flt = imfilter(flt,arg.gauss,'symmetric');
@@ -960,6 +989,8 @@ classdef (Abstract) Scope < handle
             if arg.assign
                 Scp.FlatFields.(char(Scp.mmc.getCurrentConfig('FlatField')))=flt;
             end
+            
+            Scp.CorrectFlatField = 1;
             
         end
         
@@ -993,13 +1024,10 @@ classdef (Abstract) Scope < handle
         function goto(Scp,label,Pos,varargin)
             
             Scp.TimeStamp = 'startmove';
-
             arg.plot = Scp.plotPlate;
             arg.single = true;
             arg.feature='';
             arg = parseVarargin(varargin,arg);
-
-            
             
             if nargin==2 || isempty(Pos) % no position list provided
                 Pos  = Scp.createPositions('tmp',true,'prefix','');
@@ -1042,13 +1070,15 @@ classdef (Abstract) Scope < handle
             end
             
             % update display (unless low overhead is enabled)
-            if arg.plot %Scp.reduceAllOverheadForSpeed &&
+            if ~Scp.reduceAllOverheadForSpeed && arg.plot
                 plot(Pos,Scp,'fig',Scp.Chamber.Fig.fig,'label',label,'single',single);
             end
+            
+            %pause(1);
             Scp.TimeStamp = 'endmove';
             ifMulti = regexp(label,'_');
             if ifMulti
-            label = label(1:ifMulti(1)-1);
+                label = label(1:ifMulti(1)-1);
             end
             if ~Scp.Strobbing
                 err =~strcmp(Scp.whereami,label); %return err=1 if end position doesnt match label
@@ -1099,11 +1129,11 @@ classdef (Abstract) Scope < handle
             arg.xy=Scp.XY; 
             arg.pixelsize=Scp.PixelSize; 
             arg.cameratranspose = false; % false means that image colums are X stage, false it is Y
-            arg.cameradirection=[1 1]; % when I move positive in X do the columns (row if transpose) move up or down
+            arg.cameradirection=[1 1]; % YX if positive movements in stage result in positive coordinate change of control point then this is 1 otherwise -1 because movements in images are in opposite direction on the stage
             arg.camera_angle = Scp.CameraAngle;
             arg = parseVarargin(varargin,arg); 
-            rc=rc-[Scp.Height Scp.Width]/2;
-            rc = rc*[[cosd(arg.camera_angle), -1*sind(arg.camera_angle)]; [sind(arg.camera_angle), cosd(arg.camera_angle)]];
+            rc=rc-[Scp.Width Scp.Height]/2;
+            rc = rc*[cosd(arg.camera_angle) sind(arg.camera_angle); [-1*sind(arg.camera_angle) cosd(arg.camera_angle)]];
             if ~arg.cameratranspose
                 xy(1)=rc(2)*arg.pixelsize*arg.cameradirection(1)+arg.xy(1); 
                 xy(2)=rc(1)*arg.pixelsize*arg.cameradirection(2)+arg.xy(2);
@@ -1144,7 +1174,6 @@ classdef (Abstract) Scope < handle
             Scp.XY=[Scp.X+dxdy(1)*frmX Scp.Y+dxdy(2)*frmY];
         end
         
-        
         function Pos = createPositionFromMMNoSet(Scp,varargin)
             arg.labels={};
             arg.groups={};
@@ -1172,7 +1201,6 @@ classdef (Abstract) Scope < handle
                 Pos.addMetadata(Scp.Pos.Labels,[],[],'experimentdata',arg.experimentdata);
             end
         end
-        
         
         function createPositionFromMM(Scp,varargin)
             arg.labels={};
@@ -1355,6 +1383,7 @@ classdef (Abstract) Scope < handle
                     WellXY = [Xcntr(ixWellsToVisit(i))+Xwell+dX Ycntr(ixWellsToVisit(i))+Ywell+dY, repmat(Scp.Z, numel(Xwell),1)];
                 end
                 
+                
                 %% add up to long list
                 Pos = add(Pos,WellXY,WellLabels);
                 
@@ -1408,7 +1437,7 @@ classdef (Abstract) Scope < handle
             
             % allow for Z correction
             if arg.manualoverride
-                unqGroup=unique(Pos.Group,'stable'); %added 'stable' to prevent flips
+                unqGroup=unique(Pos.Group,'stable');
                 for i=1:numel(unqGroup)
                     Scp.goto(unqGroup{i});
                     Scp.whereami
@@ -1450,6 +1479,72 @@ classdef (Abstract) Scope < handle
             img = reshape(img,[Scp.Width Scp.Height]);
         end
         
+        function stk = snapZstack(Scp,dZ,varargin)
+            arg.uselive = true;
+            % during seqence acqusition the interval is simply exposure. 
+            % but can't be much faster then camera frame rante (~20 fps, or
+            % 50msex interval
+            arg.mininterval = max(Scp.Exposure,50); 
+            arg = parseVarargin(varargin,arg);
+            currZ = Scp.Z;
+            stk = zeros([Scp.Height Scp.Width length(dZ)]);
+             
+            try 
+                if arg.uselive
+                    Scp.mmc.setAutoShutter(0);
+                    Scp.mmc.setShutterOpen(1);
+                    pause(arg.mininterval/1000);
+                    % clear image buffer
+                    Scp.mmc.clearCircularBuffer()
+                    Scp.mmc.startContinuousSequenceAcquisition(50);
+                    
+                    % logic of the loop is as follows: 
+                    % we need to check each time before and after the Z
+                    % movement what is the camera frame coutner and only
+                    % grab an image if counter increased. If not we wait
+                    % till timeout. 
+                    % timing is done with tic/toc, might be a fancier way
+                    % :)
+                    for i=1:length(dZ)
+                        % move stage
+                        frameCounter = Scp.mmc.getRemainingImageCount(); 
+                        Scp.Z=currZ+dZ(i);
+                        strt=now; 
+                        while Scp.mmc.getRemainingImageCount() == frameCounter
+                            pause(arg.mininterval/1000)
+                            fprintf('.');
+                            if now-strt>1/24/3600 
+                                break
+                                warning('timeout during sequence acq while performing snapZstack')
+                            end
+                        end
+                        
+                        % grab image and adjust as needed
+                        img=Scp.mmc.popNextImage;
+                        img=Scp.convertMMimgToMatlabFormat(img);
+                        if Scp.CorrectFlatField
+                            img = Scp.doFlatFieldCorrection(img);
+                        end
+                        % store in stk
+                        stk(:,:,i)=img;
+                    end
+                    Scp.mmc.stopSequenceAcquisition()
+                end
+                if arg.uselive
+                    Scp.mmc.setAutoShutter(1);
+                    Scp.mmc.setShutterOpen(0);
+                end
+                Scp.Z = currZ;
+            catch
+                % if there was any error return to "normal", i.e. back to Z
+                % and no light and autoshutter on
+                Scp.mmc.setAutoShutter(1);
+                Scp.mmc.setShutterOpen(0);
+                Scp.Z = currZ;
+            end
+            
+        end
+        
         function img = snapImage(Scp)
             if ismember(Scp.acqshow,{'single','channel','FLIR'})
                 showImg = true; 
@@ -1482,33 +1577,19 @@ classdef (Abstract) Scope < handle
         end
         
         function img=commandCameraToCapture(Scp)
-           if Scp.MMversion > 1.5 
+           if Scp.MMversion > 1.5                
                 Scp.mmc.snapImage;
                 timg=Scp.mmc.getTaggedImage;
                 img=timg.pix;
-           else
-               try %added a try catch to *try* and fix the empty buffer issue.
-                   %trying this. AOY
-                   while Scp.mmc.getRemainingImageCount()
-                       Scp.mmc.popNextTaggedImage();
-                   end
-                   Scp.mmc.snapImage;
-                   img = Scp.mmc.getImage;
-               catch
-                   pause(.005);
-                   img = Scp.mmc.getImage;
-                   if isequal(img,Scp.lastImg)
-                     Scp.mmc.snapImage;
-                     img = Scp.mmc.getImage;
-                   end
-               end
-           end
-            Scp.lastImg = img;
+            else
+                Scp.mmc.snapImage;
+                img = Scp.mmc.getImage;
+            end
             img=Scp.convertMMimgToMatlabFormat(img);
-            
             if Scp.CorrectFlatField
                 img = Scp.doFlatFieldCorrection(img);
             end
+            Scp.lastImg = img;
         end
         
         function img=convertMMimgToMatlabFormat(Scp,img)
@@ -1522,7 +1603,7 @@ classdef (Abstract) Scope < handle
             TriggeredChannels = cat(1,AcqData.Triggered);
             indx=find(TriggeredChannels);
             if isempty(indx), return, end
-            %import mmcorej.StrVector;
+            import mmcorej.StrVector;
             trgrseq = StrVector();
             
             for i=1:numel(indx)
@@ -1572,7 +1653,6 @@ classdef (Abstract) Scope < handle
             stk = cat(3,s{:});
           
         end
-        
         
         function img = snapImageHDR(Scp,varargin)
             N = ParseInputs('N',3,varargin);
@@ -1675,7 +1755,7 @@ classdef (Abstract) Scope < handle
             
             %% update GUI if not in timeCrunchMode
             if ~Scp.reduceAllOverheadForSpeed
-                Scp.studio.refreshGUI;
+                Scp.studio.refreshGUIFromCache; %referesg from mmc core cache instead of doing hardware check
             end
         end
         
@@ -1781,7 +1861,7 @@ classdef (Abstract) Scope < handle
             % get full name of objective from shortcut
             avaliableObj = Scope.java2cell(Scp.mmc.getAllowedPropertyValues(Scp.DeviceNames.Objective,'Label'));
             label_10xnew = avaliableObj{6};
-            avaliableObj{6}='20Xnew';
+            avaliableObj{6}='10Xnew';
             % only consider Dry objectives for Scp.set.Objective
             objIx = cellfun(@(f) ~isempty(regexp(f,Objective, 'once')),avaliableObj) & cellfun(@(m) ~isempty(m),strfind(avaliableObj,'Dry'));
             if nnz(objIx)~=1
@@ -1948,9 +2028,14 @@ classdef (Abstract) Scope < handle
                 fprintf('movment too small - skipping XY movement\n');
                 return
             end
-            
-            Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
-            Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+            try % Timeout error on hype scope where um misses task completely signal
+                Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
+                Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+            catch % try again
+                disp('Error during stage movement. Trying again')
+                Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
+                Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+            end
         end
                 
         %% register by previous image
@@ -2052,9 +2137,6 @@ classdef (Abstract) Scope < handle
             Scp.dXY=dXY;
             
         end
-        
-        
-        
         
         %software autofocus related stuff
         
@@ -2221,6 +2303,7 @@ classdef (Abstract) Scope < handle
                 Scp.Pos.List(i,3) = Zfocus+dZ;
             end
         end
+        
         
     end
 end

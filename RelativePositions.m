@@ -11,8 +11,7 @@ classdef RelativePositions < Positions
         
         function addRefPointsFromImage(Pos,Scp,Labels,varargin)
             arg.channel='Brightfield'; 
-            arg.cameradirection = [1 1];
-            arg.pixelsize = Scp.PixelSize; % nee to give pixelsie as arg
+            arg.pixelsize = Scp.PixelSize;
             arg.exposure = 75; 
             arg.cameradirection = [1 -1];
             arg.pixelsize = Scp.PixelSize;
@@ -31,20 +30,22 @@ classdef RelativePositions < Positions
             
             %%
             figure(arg.fig); 
-            imshow(imadjust(img, [prctile(img(:), 10) prctile(img(:), 95)]))
+            imshow(imadjust(img, [prctile(img(:), 20) prctile(img(:), 97)]))
             hold on
             rc=nan(1,2); 
             Tnow=arg.t;
             for i=1:numel(Labels)
                 title(Labels{i})
-                rc([2 1])=ginput(1); 
+                rc([2 1])=ginput(1); % rc first coordinate is y and second coordinate is x in image
                 text(rc(2),rc(1),Labels{i},'fontsize',14,'color','red')
+                disp(rc)
                 xy=Scp.rc2xy(rc, 'cameradirection', arg.cameradirection, 'pixelsize', arg.pixelsize); 
                 if strcmp(Pos.axis,'XY')
                     z=0; 
                 else
                     z=Scp.Z; 
                 end
+                disp(xy)
                 addRefPoint(Pos,Labels{i},[xy z],Tnow)
             end
 
@@ -100,6 +101,7 @@ classdef RelativePositions < Positions
             assert(size(Pos.RefFeatureList,1)>0,'Missing Ref Points')
             
             % get transformation
+            % Why calculate this each time???
             regParams = getTform(Pos); 
                         
             % transform
