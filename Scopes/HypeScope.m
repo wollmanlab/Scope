@@ -9,9 +9,9 @@ classdef HypeScope < Scope
         currentHybe = '';
         acqname = '';
         BeadFocus;
-        
+        AF = AutoFocusOfTheseus;
         LargeMove = 500; % large movement, i.e. break the move into steps and autofocus in between 
-        
+        Notifications = Notifications;
     end
     
     
@@ -199,7 +199,7 @@ classdef HypeScope < Scope
             % Changed to fliplr(img) only so that images are in same
             % orientation as on the Ninja;
             %img = flipud(img);
-            img = fliplr(img);
+            %img = fliplr(img);
         end
         
         
@@ -218,6 +218,10 @@ classdef HypeScope < Scope
             
             
             switch lower(Scp.AutoFocusType)
+                case 'theseus'
+                    Scp.AF = Scp.AF.findFocus(Scp);
+                case 'relative'
+                    RelativeAutoFocus(Scp);
                 case 'hardware'
                     tic
                     confidence_thresh = 500;
@@ -773,21 +777,22 @@ classdef HypeScope < Scope
                 fprintf('movment too small - skipping XY movement\n');
                 return
             end
-            if dist > Scp.LargeMove
-                n=ceil(dist/Scp.LargeMove);
-                XYvec = [linspace(currXY(1),XY(1),n)' linspace(currXY(2),XY(2),n)'];
-                for i=1:n
-                    try % Timeout error on hype scope where um misses task completely signal
-                        Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XYvec(i,1),XYvec(i,2))
-                        Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
-                    catch % try again
-                        disp('Error during stage movement. Trying again')
-                        Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XYvec(i,1),XYvec(i,2))
-                        Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
-                    end
-                    Scp.autofocus; 
-                end
-            end
+            Scp.autofocus; 
+%             if dist > Scp.LargeMove
+%                 n=ceil(dist/Scp.LargeMove);
+%                 XYvec = [linspace(currXY(1),XY(1),n)' linspace(currXY(2),XY(2),n)'];
+%                 for i=1:n
+%                     try % Timeout error on hype scope where um misses task completely signal
+%                         Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XYvec(i,1),XYvec(i,2))
+%                         Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+%                     catch % try again
+%                         disp('Error during stage movement. Trying again')
+%                         Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XYvec(i,1),XYvec(i,2))
+%                         Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+%                     end
+%                     Scp.autofocus; 
+%                 end
+%             end
             try % Timeout error on hype scope where um misses task completely signal
                 Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
                 Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
