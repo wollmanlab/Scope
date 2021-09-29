@@ -33,9 +33,9 @@ classdef Kilroy
             start = clock;
             while self.checkStatus
                 self.checkStatus;
-                fprintf('\b');
+                fprintf('\n');
                 fprintf('Elapsed time waiting: %f', etime(clock, start))
-                pause(5);
+                pause(10);
             end
         end
         

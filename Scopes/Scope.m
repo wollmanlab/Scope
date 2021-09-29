@@ -367,7 +367,8 @@ classdef (Abstract) Scope < handle
                 %% deal with metadata of scope parameters
                 if isempty(arg.refposname)
 
-                    grp = Scp.Pos.peek('group',true); % the position group name, e.g. the well
+                    %grp = Scp.Pos.peek('group',true); % the position group name, e.g. the well
+                    grp = Scp.Pos.peek;
                     pos = Scp.Pos.peek; 
                 else
                     grp = 'RefPoints'; 

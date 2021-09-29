@@ -1,7 +1,9 @@
 classdef NinjaScope < Scope
    
     properties
-       OptovarStatus=[]; 
+       OptovarStatus=[];
+       Microscope = 'NinjaScope';
+       Notifications = Notifications;
     end
     
     methods
@@ -197,8 +199,36 @@ classdef NinjaScope < Scope
                         pause(Scp.autofocusTimeout/1000)
                     end
                     if (now-t0)*24*3600 > Scp.autofocusTimeout
-                        msgbox('Out of Focus ! watch out!!!');
+                        % Anything we can do remotely to regain Focus Lock
+                        % Stop Imaging until focus is fixed?
+                        message = 'Autofocus Timed out Trying scan';
+                        Scp.Notifications.sendSlackMessage(Scp,message);
+                        %msgbox('Out of Focus ! watch out!!!');
+                        Window = 50;
+                        Step = 20;
+                        dZ = linspace(-Window, Window, 1+(Window+Window)/Step);
+                        current_Z = Scp.Z;
+                        for i = 1:length(dZ)
+                            Scp.mmc.enableContinuousFocus(false);
+                            Scp.Z = current_Z + dZ(i);
+                            pause(1)
+                            Scp.mmc.enableContinuousFocus(true);
+                            pause(1)
+                            if Scp.mmc.isContinuousFocusLocked
+                                break
+                            end
+                        end
                     end
+                    Scp.mmc.enableContinuousFocus(true);
+                    if ~Scp.mmc.isContinuousFocusLocked
+                        % Anything we can do remotely to regain Focus Lock
+                        % Stop Imaging until focus is fixed?
+                        message = [' Autofocus Lost Focus and Needs Help',newline,'Turn On Live',newline,'Manually Find Focus',newline,'Then Click OK'];
+                        Scp.Notifications.sendSlackMessage(Scp,message);
+                        uiwait(msgbox(message));
+                        Scp.mmc.enableContinuousFocus(true);
+                    end
+                    
                 case 'software'
                     if length(AcqData)~=1
                         error('autofocus can only get a single channel!')
