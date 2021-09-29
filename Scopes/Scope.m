@@ -116,6 +116,8 @@ classdef (Abstract) Scope < handle
         
         %% Live shift adjust
         shiftfilepath =[];
+        
+        MMversion = 2.0;
                 
     end
     
@@ -129,7 +131,7 @@ classdef (Abstract) Scope < handle
         XY % so I can set them togahter in a singla call
         pth
         relpth
-        MMversion
+%         MMversion
     end
     
     
@@ -158,7 +160,6 @@ classdef (Abstract) Scope < handle
             warning('off','Images:initSize:adjustingMag')
             warning('off','Images:imshow:magnificationMustBeFitForDockedFigure')
             
-            run('ScopeStartup')
         end
         
         function acqZstack(Scp,AcqData,acqname,dZ,varargin)
@@ -395,7 +396,7 @@ classdef (Abstract) Scope < handle
                 
                 %% deal with metadata of scope parameters
                 if isempty(arg.refposname)
-                    if class(Scp,'HypeScope')
+                    if isa(Scp,'HypeScope')
                         pos = Scp.Pos.peek;
                         grp = pos; %hypescope hack
                     else
@@ -621,16 +622,16 @@ classdef (Abstract) Scope < handle
             
         end
         
-        function ver = get.MMversion(Scp)
-            %%
-            try
-                verstr = Scp.studio.getVersion;
-            catch
-                verstr = Scp.studio.getVersion;
-            end
-            prts = regexp(char(verstr),'\.','split');
-            ver = str2double([prts{1} '.' prts{2}]);
-        end
+%         function ver = get.MMversion(Scp)
+%             %%
+%             try
+%                 verstr = Scp.studio.getVersion;
+%             catch
+%                 verstr = Scp.studio.getVersion;
+%             end
+%             prts = regexp(char(verstr),'\.','split');
+%             ver = str2double([prts{1} '.' prts{2}]);
+%         end
         
         function acquire(Scp,AcqData,varargin)
             
@@ -1174,20 +1175,37 @@ classdef (Abstract) Scope < handle
             Scp.XY=[Scp.X+dxdy(1)*frmX Scp.Y+dxdy(2)*frmY];
         end
         
-        function Pos = createPositionFromMMNoSet(Scp,varargin)
+        function Pos = createPositionFromMM(Scp,varargin)
+            arg.updateScp = true;
             arg.labels={};
             arg.groups={};
             arg.axis={'XY'};
             arg.message = 'Please click when you finished marking position';
             arg.experimentdata=struct([]);
+            arg.postype = 'standard'; 
             arg = parseVarargin(varargin,arg);
+                        
             if Scp.MMversion < 1.5
-                Scp.studio.showXYPositionList; %Alon
+                Scp.studio.showXYPositionList;
+                uiwait(msgbox(arg.message))
+                PL = Scp.studio.getPositionList; 
             else
-                Scp.studio.showPositionList;
+                arg.message = ['Please open up position dialog in MM',newline,'Tools>Stage Position List',newline,'Click OK when Done'];
+                PLM = Scp.studio.getPositionListManager;
+                PL = PLM.getPositionList;
+                PLM.setPositionList(PL); 
+                uiwait(msgbox(arg.message))
+                PL = PLM.getPositionList;
             end
-            uiwait(msgbox(arg.message))
-            Pos = Positions(Scp.studio.getPositionList,'axis',arg.axis);
+            
+            switch arg.postype
+                case 'standard'
+                    Pos = Positions(PL,'axis',arg.axis);
+                case 'relative'
+                    Pos = RelativePositions(PL,'axis',arg.axis);
+                case 'beads'
+                    Pos = RelativePositionsUsingBeads(PL,'axis',arg.axis);
+            end
             if ~isempty(arg.labels)
                 Pos.Labels = arg.labels;
                 if isempty(arg.groups)
@@ -1198,35 +1216,10 @@ classdef (Abstract) Scope < handle
                 Pos.Group=arg.groups;
             end
             if ~isempty(arg.experimentdata)
-                Pos.addMetadata(Scp.Pos.Labels,[],[],'experimentdata',arg.experimentdata);
+                Pos.addMetadata(Pos.Labels,[],[],'experimentdata',arg.experimentdata);
             end
-        end
-        
-        function createPositionFromMM(Scp,varargin)
-            arg.labels={};
-            arg.groups={};
-            arg.axis={'XY'};
-            arg.message = 'Please click when you finished marking position';
-            arg.experimentdata=struct([]);
-            arg = parseVarargin(varargin,arg);
-            if Scp.MMversion < 1.5
-                Scp.studio.showXYPositionList; %Alon
-            else
-                Scp.studio.showPositionList;
-            end
-            uiwait(msgbox(arg.message))
-            Scp.Pos = Positions(Scp.studio.getPositionList,'axis',arg.axis);
-            if ~isempty(arg.labels)
-                Scp.Pos.Labels = arg.labels;
-                if isempty(arg.groups)
-                    Scp.Pos.Group=arg.labels;
-                end
-            end
-            if ~isempty(arg.groups)
-                Scp.Pos.Group=arg.groups;
-            end
-            if ~isempty(arg.experimentdata)
-                Scp.Pos.addMetadata(Scp.Pos.Labels,[],[],'experimentdata',arg.experimentdata);
+            if arg.updateScp
+                Scp.Pos = Pos;
             end
         end
        
@@ -1496,7 +1489,7 @@ classdef (Abstract) Scope < handle
                     pause(arg.mininterval/1000);
                     % clear image buffer
                     Scp.mmc.clearCircularBuffer()
-                    Scp.mmc.startContinuousSequenceAcquisition(50);
+                    Scp.mmc.startContinuousSequenceAcquisition(arg.mininterval);
                     
                     % logic of the loop is as follows: 
                     % we need to check each time before and after the Z
@@ -1519,8 +1512,12 @@ classdef (Abstract) Scope < handle
                             end
                         end
                         
+                        % altenative - clear buffer before each dZ movement
+                        % and get last image. 
                         % grab image and adjust as needed
-                        img=Scp.mmc.popNextImage;
+                        while Scp.mmc.getRemainingImageCount() ~= frameCounter
+                            img=Scp.mmc.popNextImage;
+                        end
                         img=Scp.convertMMimgToMatlabFormat(img);
                         if Scp.CorrectFlatField
                             img = Scp.doFlatFieldCorrection(img);

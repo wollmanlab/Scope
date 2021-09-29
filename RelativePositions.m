@@ -9,6 +9,10 @@ classdef RelativePositions < Positions
     
     methods
         
+        function Pos = RelativePositions(fullfilename,varargin)
+            Pos@Positions(fullfilename,varargin)
+        end
+        
         function addRefPointsFromImage(Pos,Scp,Labels,varargin)
             arg.channel='Brightfield'; 
             arg.pixelsize = Scp.PixelSize;
@@ -97,19 +101,23 @@ classdef RelativePositions < Positions
             % first get xyz without in relative units
             xyz = getPositionFromLabel@Positions(Pos,label);
             xyzorg=xyz; 
-            % check that there are enough ref points
-            assert(size(Pos.RefFeatureList,1)>0,'Missing Ref Points')
-            
-            % get transformation
-            % Why calculate this each time???
-            regParams = getTform(Pos); 
-                        
-            % transform
-            if strcmp(Pos.axis,'XY')
-               xyzrtrn = regParams.R(1:2,1:2)*xyz' + regParams.t(1:2); 
+            if isempty(Pos.RefFeatureList())
+                xyzrtrn = xyzorg;
+                % check that there are enough ref points
+                %assert(size(Pos.RefFeatureList,1)>0,'Missing Ref Points')
             else
-                xyzrtrn = regParams.R*xyz' + regParams.t;
+                % get transformation
+                % Why calculate this each time???
+                regParams = getTform(Pos);
+                
+                % transform
+                if strcmp(Pos.axis,'XY')
+                    xyzrtrn = regParams.R(1:2,1:2)*xyz' + regParams.t(1:2);
+                else
+                    xyzrtrn = regParams.R*xyz' + regParams.t;
+                end
             end
+            
         end
         
         function regParams = getTform(Pos,varargin)

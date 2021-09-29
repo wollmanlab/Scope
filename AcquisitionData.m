@@ -8,6 +8,7 @@ classdef AcquisitionData
         dZ
         Marker
         Fluorophore
+        Delay = 0; 
         Triggered = false; 
         Skip = 1; 
     end

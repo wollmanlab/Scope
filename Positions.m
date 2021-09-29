@@ -139,7 +139,8 @@ classdef Positions < handle
                     Pos.Labels{i}=char(ps.getLabel);
                 end
             end
-            if nargin && isa(fullfilename,'org.micromanager.navigation.PositionList')
+            if nargin && (isa(fullfilename,'org.micromanager.navigation.PositionList') || ... 
+                          isa(fullfilename,'org.micromanager.PositionList'))
                 Pos.Group=Pos.Labels; 
             end
         end

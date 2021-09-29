@@ -57,7 +57,7 @@ classdef Kilroy
 %             
             
         function close(self)
-            fclose(self.socket)
+            fclose(self.socket);
         end
     end
     

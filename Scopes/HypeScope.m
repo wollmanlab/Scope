@@ -17,60 +17,47 @@ classdef HypeScope < Scope
     
     methods
         
-        %         function acquire(Scp,AcqData,varargin)
-        %
-        %             %% parse optional input arguments
-        %
-        %             arg.baseacqname='acq';
-        %             arg.show=Scp.acqshow;
-        %             arg.save=Scp.acqsave;
-        %             arg.closewhendone=false;
-        %             arg.type = 'time(site)';
-        %             arg.func = [];
-        %             arg.acqname = '';
-        %             arg.dz=[];
-        %             arg.channelfirst = true; % used for Z stack
-        %             arg = parseVarargin(varargin,arg);
-        %
-        %             %% Flush the Zyla42 image buffer
-        %             Scp.mmc.setCameraDevice('Zyla42');
-        %             %             Scp.mmc.getImage();
-        %             %             Scp.mmc.setCameraDevice('ZeissAxioCam');
-        %             %% Init Acq
-        %             if isempty(arg.acqname)
-        %                 acqname = Scp.initAcq(AcqData,arg);
-        %             else
-        %                 acqname = arg.acqname;
-        %             end
-        %
-        %
-        %             %% move scope to camera port
-        %             %             Scp.mmc.setProperty(Scp.LightPath{1},Scp.LightPath{2},Scp.LightPath{3});
-        %
-        %             %% set up acq function
-        %             if isempty(arg.func)
-        %                 if isempty(arg.dz)
-        %                     arg.func = @() acqFrame(Scp,AcqData,acqname);
-        %                 else
-        %                     arg.func = @() acqZstack(Scp,AcqData,acqname,arg.dz,'channelfirst',arg.channelfirst);
-        %                 end
-        %             end
-        %
-        %
-        %             %% start a mutli-time / Multi-position / Multi-Z acquisition
-        %             switch arg.type
-        %                 case 'time(site)'
-        %                     func = @() multiSiteAction(Scp,arg.func);
-        %                     multiTimepointAction(Scp,func);
-        %                 case 'site(time)'
-        %                     func = @() multiTimepointAction(Scp,arg.func);
-        %                     multiSiteAction(Scp,func);
-        %             end
-        %
-        %             Scp.MD.saveMetadata(fullfile(Scp.pth,acqname));
-        %             Scp.MD.exportMetadata(fullfile(Scp.pth,acqname));
-        %
-        %         end
+        function Scp = HypeScope()
+            % call "super" constuctor
+            Scp@Scope; 
+            
+            addpath('C:\Program Files\Micro-Manager-2.0gamma')
+
+            Scp.studio = StartMMStudio('C:\Program Files\Micro-Manager-2.0gamma');
+            
+            % Scp.gui = Scp.studio.getMMStudioMainFrameInstance;
+            
+            Scp.mmc = Scp.studio.getCMMCore;
+            
+            Scp.LiveWindow = Scp.studio.live;
+            Scp.ScopeName = 'Zeiss_Axio_0';
+            
+            import org.micromanager.navigation.*
+            Scp.CameraName = 'Zyla42';
+            
+            Scp.CameraAngle = 2.75;
+
+            %% Scope-startup - runs Nikon-Epi specific configurations
+            Scp.basePath = 'D:\HypeImages';
+            
+            %% some propeties require knowing the name of the device
+            Scp.DeviceNames.Objective = 'ZeissObjectiveTurret';
+            % There is no offset device Scp.DeviceNames.AFoffset = 'TIPFSOffset';
+            
+            %%
+            %% Autofocus method
+            Scp.AutoFocusType = 'hardware';
+            Scp.Optovar = 0;
+            
+            Scp.CorrectFlatField = false; 
+            
+            Scp.Chamber = Plate('Robs PDMS');
+            Scp.Chamber.wellSpacingXY = [8500 8000];
+            Scp.Chamber.x0y0 = [0 0]; 
+            Miji;
+            
+        end
+        
         function acqZcalibration(Scp, AcqData, acqname, dZ, varargin)
             %disp('starting z stack')
             % acqZstack acquires a whole Z stack
