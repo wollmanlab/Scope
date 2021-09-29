@@ -9,10 +9,13 @@ classdef RelativePositions < Positions
     
     methods
         
+        function Pos = RelativePositions(fullfilename,varargin)
+            Pos@Positions(fullfilename,varargin)
+        end
+        
         function addRefPointsFromImage(Pos,Scp,Labels,varargin)
             arg.channel='Brightfield'; 
-            arg.cameradirection = [1 1];
-            arg.pixelsize = Scp.PixelSize; % nee to give pixelsie as arg
+            arg.pixelsize = Scp.PixelSize;
             arg.exposure = 75; 
             arg.cameradirection = [1 -1];
             arg.pixelsize = Scp.PixelSize;
@@ -31,20 +34,22 @@ classdef RelativePositions < Positions
             
             %%
             figure(arg.fig); 
-            imshow(imadjust(img, [prctile(img(:), 10) prctile(img(:), 95)]))
+            imshow(imadjust(img, [prctile(img(:), 20) prctile(img(:), 97)]))
             hold on
             rc=nan(1,2); 
             Tnow=arg.t;
             for i=1:numel(Labels)
                 title(Labels{i})
-                rc([2 1])=ginput(1); 
+                rc([2 1])=ginput(1); % rc first coordinate is y and second coordinate is x in image
                 text(rc(2),rc(1),Labels{i},'fontsize',14,'color','red')
+                disp(rc)
                 xy=Scp.rc2xy(rc, 'cameradirection', arg.cameradirection, 'pixelsize', arg.pixelsize); 
                 if strcmp(Pos.axis,'XY')
                     z=0; 
                 else
                     z=Scp.Z; 
                 end
+                disp(xy)
                 addRefPoint(Pos,Labels{i},[xy z],Tnow)
             end
 
@@ -96,18 +101,23 @@ classdef RelativePositions < Positions
             % first get xyz without in relative units
             xyz = getPositionFromLabel@Positions(Pos,label);
             xyzorg=xyz; 
-            % check that there are enough ref points
-            assert(size(Pos.RefFeatureList,1)>0,'Missing Ref Points')
-            
-            % get transformation
-            regParams = getTform(Pos); 
-                        
-            % transform
-            if strcmp(Pos.axis,'XY')
-               xyzrtrn = regParams.R(1:2,1:2)*xyz' + regParams.t(1:2); 
+            if isempty(Pos.RefFeatureList())
+                xyzrtrn = xyzorg;
+                % check that there are enough ref points
+                %assert(size(Pos.RefFeatureList,1)>0,'Missing Ref Points')
             else
-                xyzrtrn = regParams.R*xyz' + regParams.t;
+                % get transformation
+                % Why calculate this each time???
+                regParams = getTform(Pos);
+                
+                % transform
+                if strcmp(Pos.axis,'XY')
+                    xyzrtrn = regParams.R(1:2,1:2)*xyz' + regParams.t(1:2);
+                else
+                    xyzrtrn = regParams.R*xyz' + regParams.t;
+                end
             end
+            
         end
         
         function regParams = getTform(Pos,varargin)

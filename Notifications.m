@@ -24,8 +24,9 @@ classdef Notifications
             slack_hooks('NinjaScope') = 'https://hooks.slack.com/services/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';
             slack_hooks('HypeScope') = 'https://hooks.slack.com/services/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';
             
-            if isKey(slack_hooks,Scp.Microscope)
-                hook = slack_hooks(Scp.Microscope);
+
+            if isKey(slack_hooks,class(Scp))
+                hook = slack_hooks(class(Scp));
             else
                 hook = slack_hooks('NinjaScope');
             end  
