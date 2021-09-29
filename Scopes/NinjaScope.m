@@ -2,11 +2,51 @@ classdef NinjaScope < Scope
    
     properties
        OptovarStatus=[];
-       Microscope = 'NinjaScope';
        Notifications = Notifications;
     end
     
     methods
+        
+        function Scp = NinjaScope()
+            Scp@Scope();
+            addpath('C:Fiji.app\scripts')
+            addpath('C:\Program Files\Micro-Manager-2.0gamma')
+            import mmcorej.*;
+            import org.micromanager.*;
+            Scp.studio = StartMMStudio('C:\Program Files\Micro-Manager-2.0gamma');
+            Scp.mmc = Scp.studio.getCMMCore;
+            
+            Scp.ErrorLogPth='C:\Scope\ErrorLogs';
+            
+            disp('My name is Ninja and I am a microscope. ')
+            Scp.basePath = 'F:\WollmanLabEpiScopeData';
+            Scp.DeviceNames.Objective = 'TINosePiece';
+            Scp.DeviceNames.AFoffset = 'TIPFSOffset';
+            Scp.DeviceNames.LightPath = {'TILightPath','Label','Left100', 'Right100'};
+            Scp.ScopeName = 'Ninja';
+            Scp.mmc.setChannelGroup('Channel');
+            Scp.CameraName = 'FLIR';
+            Scp.TriggerDeviceName='LEDarray-Switch';
+            Scp.CameraAngle = 3.2857;
+            %end
+            
+            Scp.mmc.setProperty('Camera','Gain-AutoOrManual','Manual');
+            Scp.mmc.setProperty('Camera','Gain(dB)','4');
+            Scp.Chamber = Plate('Costar96 (3904)');
+            Scp.Chamber.x0y0 = [ 49776      -31364];
+            Scp.Chamber.directionXY = [-1 1];
+            Scp.AutoFocusType = 'Hardware';
+            
+            
+            %% Flatfield
+            %if strcmp(button,'Nikon')
+            Scp.FlatFieldsFileName='F:\WollmanLabEpiScopeData\FlatFieldCorrections\Flatfield.mat';
+            %Scp.loadFlatFields;
+            %Scp.CorrectFlatField = false;
+            Scp.mmc.setProperty(Scp.DeviceNames.LightPath{1},Scp.DeviceNames.LightPath{2},Scp.DeviceNames.LightPath{4});
+            Miji;
+        end
+        
         function Texpose = lightExposure(Scp,ExcitationPosition,Time,varargin)
             arg.units = 'seconds';
             arg.dichroic = '425LP';

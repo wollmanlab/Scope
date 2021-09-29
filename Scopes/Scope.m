@@ -401,6 +401,7 @@ classdef (Abstract) Scope < handle
                         pos = Scp.Pos.peek;
                         grp = pos; %hypescope hack
                     else
+                        pos = Scp.Pos.peek;
                         grp = Scp.Pos.peek('group',true); % the position group name, e.g. the well
                     end
                                       
