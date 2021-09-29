@@ -5,14 +5,8 @@ classdef Notifications
     
     methods
         function [user,hook] = populateSlackAddresses(~,Scp)
-            slack_users = containers.Map;
-            slack_users('Zach') = '@zehemminger';
-            slack_users('Maeve') = '@mnagle7';
-            slack_users('Gaby') = '@gsanc011';
-            slack_users('Roy') = '@rwollman';
-            slack_users('Jonathan') = '@froblinkin';
-            slack_users('Christine') = '@cmminor';
-            slack_users('Lisa') = '@huiqinwang';
+            slack_users = load('notifications_handles.mat');
+            slack_users = slack_users.slack_users;
             
             if isKey(slack_users,Scp.Username)
                 user = slack_users(Scp.Username);
@@ -20,10 +14,8 @@ classdef Notifications
                 user = '';
             end
                         
-            slack_hooks = containers.Map;
-            slack_hooks('NinjaScope') = 'https://hooks.slack.com/services/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';
-            slack_hooks('HypeScope') = 'https://hooks.slack.com/services/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';
-            
+            slack_hooks = load('notifications_addresses.mat');
+            slack_hooks = slack_hooks.slack_hooks;
 
             if isKey(slack_hooks,class(Scp))
                 hook = slack_hooks(class(Scp));
