@@ -58,7 +58,7 @@ classdef Metadata < handle
         
         dieOnReadError = false;
         
-        defaultTypes = {  'Zindex' 'Z' 'Channel'    'Exposure'    'Fluorophore'    'Marker'    'PixelSize'    'PlateType'    'Position'    'Skip'    'TimestampFrame'    'TimestampImage'    'XY'    'acq'    'frame'    'group' 'AllInputs' 'XYbeforeTransform'}'
+        defaultTypes = { 'Scope' 'Zindex' 'Z' 'Channel'    'Exposure'    'Fluorophore'    'Marker'    'PixelSize'    'PlateType'    'Position'    'Skip'    'TimestampFrame'    'TimestampImage'    'XY'    'acq'    'frame'    'group' 'AllInputs' 'XYbeforeTransform'}'
     end
     
     properties (Transient = true)

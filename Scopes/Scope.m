@@ -410,7 +410,7 @@ classdef (Abstract) Scope < handle
                     pos = arg.refposname; 
                 end
                 [~,xy_before_transform] = Scp.Pos.getPositionFromLabel(Scp.Pos.peek); 
-                ix(i) = Scp.MD.addNewImage(filename,'FlatField',Scp.CurrentFlatFieldConfig,'Position',pos,'group',grp,'acq',acqname,'frame',t,'TimestampImage',T(i),'XY',XY,'PixelSize',Scp.PixelSize,'PlateType',Scp.Chamber.type,'Z',Zformd,'Zindex',arg.z,'XYbeforeTransform',xy_before_transform); %#ok<PROPLC>
+                ix(i) = Scp.MD.addNewImage(filename,'Scope',class(Scp),'FlatField',Scp.CurrentFlatFieldConfig,'Position',pos,'group',grp,'acq',acqname,'frame',t,'TimestampImage',T(i),'XY',XY,'PixelSize',Scp.PixelSize,'PlateType',Scp.Chamber.type,'Z',Zformd,'Zindex',arg.z,'XYbeforeTransform',xy_before_transform); %#ok<PROPLC>
                 fld = fieldnames(AcqData(i));
                 for j=1:numel(fld)
                     if ~isempty(AcqData(i).(fld{j}))
