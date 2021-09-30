@@ -36,6 +36,20 @@ classdef (Abstract) AutoFocus < handle
                    end
                 end
             end
+%             if isempty(Scp.MD)
+%                 AF.current_acq = 'default';
+%             else
+%                 AF.current_acq = Scp.MD;
+%             end
+            % Add Focus to Found Focus Reliquary
+            label=['x_',int2str(Scp.X),'_y_',int2str(Scp.Y)];
+            if isKey(AF.focus_reliquary,AF.current_acq)
+                current_reliquary = AF.focus_reliquary(AF.current_acq);
+            else
+                current_reliquary = containers.Map;
+            end
+            current_reliquary(label) = [Scp.X,Scp.Y,Scp.Z];
+            AF.focus_reliquary(AF.current_acq) = current_reliquary;
         end
         
         function AF = checkFocus(AF,Scp,varargin)
