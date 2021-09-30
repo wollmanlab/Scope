@@ -28,7 +28,7 @@ classdef HypeScope < Scope
             % Scp.gui = Scp.studio.getMMStudioMainFrameInstance;
             
             Scp.mmc = Scp.studio.getCMMCore;
-            
+            Scp.mmc.setChannelGroup('Channel');
             Scp.LiveWindow = Scp.studio.live;
             Scp.ScopeName = 'Zeiss_Axio_0';
             
