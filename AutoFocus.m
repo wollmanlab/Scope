@@ -13,6 +13,7 @@ classdef (Abstract) AutoFocus < handle
     
     methods
         function AF = findFocus(AF,Scp,varargin)
+            AF.foundFocus = false;
             AF.start_Z = Scp.Z;
             % First Check Focus
             AF = AF.checkFocus(Scp,varargin);
