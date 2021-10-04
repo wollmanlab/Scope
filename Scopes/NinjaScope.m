@@ -10,7 +10,7 @@ classdef NinjaScope < Scope
         
         function Scp = NinjaScope()
             Scp@Scope();
-            addpath('C:Fiji.app\scripts')
+            addpath('C:\Fiji.app\scripts')
             addpath('C:\Program Files\Micro-Manager-2.0gamma')
             import mmcorej.*;
             import org.micromanager.*;
