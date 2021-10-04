@@ -51,8 +51,8 @@ classdef HypeScope < Scope
             
             Scp.CorrectFlatField = false; 
             
-            Scp.Chamber = Plate('Robs PDMS');
-            Scp.Chamber.wellSpacingXY = [8500 8000];
+            Scp.Chamber = Plate('Coverslip');
+%             Scp.Chamber.wellSpacingXY = [8500 8000];
             Scp.Chamber.x0y0 = [0 0]; 
             Miji;
             
@@ -210,91 +210,92 @@ classdef HypeScope < Scope
                 case 'relative'
                     RelativeAutoFocus(Scp);
                 case 'hardware'
-                    tic
-                    confidence_thresh = 500;
-                    course_search_range = 400;
-                    tolerance = 400;
-                    [move confidence pos] = Scp.Devices.df.checkFocus(Scp);
-                    predicted_movement=move;
-                    %disp(['Movement (um):', num2str(move), ' with ', num2str(confidence), ' confidence.'])
-                    if confidence > confidence_thresh
-                        move_magnitude = 10000;
-                        if abs(move)<min_movement
-                            disp('Movement too small.')
-                            return
-                        end
-                        while (abs(move) < move_magnitude) && (abs(move) > min_movement)
-                            Scp.move_focus(move);
-                            total_movement = total_movement+move;
-                            move_magnitude = abs(move);
-                            [move confidence pos] = Scp.Devices.df.checkFocus();
-                        end
-                        Scp.good_focus_z = [Scp.good_focus_z Scp.Z];
-                        total_movement./predicted_movement;
-                        
-                    else
-                        % implement wait 2 sec then try again
-                        current_focus = Scp.Z;
-                        found_focus = 0;
-                        disp('Trying course grain focus find.')
-                        ave_z = nanmedian(Scp.good_focus_z);
-                        search_range = linspace(ave_z-course_search_range, ave_z+course_search_range, 24);
-                        if max(search_range)>ave_z+tolerance
-                            error('Range max bigger tolerance.')
-                        end
-                        attempt_counter = 1;
-                        for z_val = search_range
-                            
-                            Scp.Z = z_val;
-                            [move confidence mi] = Scp.Devices.df.checkFocus(Scp);
-                            if confidence > confidence_thresh
-                                move_magnitude = 10000;
-                                while (abs(move) < move_magnitude) & (abs(move) > min_movement)%& (max(search_range)<ave_z+tolerance)
-                                    Scp.move_focus(move);
-                                    total_movement = total_movement+move;
-                                    move_magnitude = abs(move);
-                                    [move confidence mi] = Scp.Devices.df.checkFocus(Scp);
-                                end
-                                if confidence < confidence_thresh
-                                    pause(0.2)
-                                    continue
-                                else
-                                    found_focus=1;
-                                    move_magnitude = 10000;
-                                    if abs(move)<min_movement
-                                        disp('Movement too small.')
-                                        return
-                                    end
-                                    while (abs(move) < move_magnitude) & (abs(move) > min_movement)
-                                        Scp.move_focus(move);
-                                        total_movement = total_movement+move;
-                                        move_magnitude = abs(move);
-                                        [move confidence pos] = Scp.Devices.df.checkFocus(Scp);
-                                    end
-                                    if confidence<confidence_thresh
-                                        continue
-                                    else
-                                        Scp.good_focus_z = [Scp.good_focus_z Scp.Z];
-                                        break
-                                    end
-                                end
-                            end
-                            
-                        end
-                        if found_focus
-                            disp('Woo hoo found course focus')
-                            
-                        else
-                            Scp.Z = current_focus;
-                            Scp.Z = ave_z;
-                            disp('Did not have confidence in finding focus. Should implement better course find if this happens a lot.')
-                            worked=0;
-                            Scp.focus_fail = Scp.focus_fail+1;
-                        end
-                        
-                    end
-                    toc
-                    %                     Scp.mmc.sleep(1);
+                    Scp.AF = Scp.AF.findFocus(Scp);
+%                     tic
+%                     confidence_thresh = 500;
+%                     course_search_range = 400;
+%                     tolerance = 400;
+%                     [move confidence pos] = Scp.Devices.df.checkFocus(Scp);
+%                     predicted_movement=move;
+%                     %disp(['Movement (um):', num2str(move), ' with ', num2str(confidence), ' confidence.'])
+%                     if confidence > confidence_thresh
+%                         move_magnitude = 10000;
+%                         if abs(move)<min_movement
+%                             disp('Movement too small.')
+%                             return
+%                         end
+%                         while (abs(move) < move_magnitude) && (abs(move) > min_movement)
+%                             Scp.move_focus(move);
+%                             total_movement = total_movement+move;
+%                             move_magnitude = abs(move);
+%                             [move confidence pos] = Scp.Devices.df.checkFocus();
+%                         end
+%                         Scp.good_focus_z = [Scp.good_focus_z Scp.Z];
+%                         total_movement./predicted_movement;
+%                         
+%                     else
+%                         % implement wait 2 sec then try again
+%                         current_focus = Scp.Z;
+%                         found_focus = 0;
+%                         disp('Trying course grain focus find.')
+%                         ave_z = nanmedian(Scp.good_focus_z);
+%                         search_range = linspace(ave_z-course_search_range, ave_z+course_search_range, 24);
+%                         if max(search_range)>ave_z+tolerance
+%                             error('Range max bigger tolerance.')
+%                         end
+%                         attempt_counter = 1;
+%                         for z_val = search_range
+%                             
+%                             Scp.Z = z_val;
+%                             [move confidence mi] = Scp.Devices.df.checkFocus(Scp);
+%                             if confidence > confidence_thresh
+%                                 move_magnitude = 10000;
+%                                 while (abs(move) < move_magnitude) & (abs(move) > min_movement)%& (max(search_range)<ave_z+tolerance)
+%                                     Scp.move_focus(move);
+%                                     total_movement = total_movement+move;
+%                                     move_magnitude = abs(move);
+%                                     [move confidence mi] = Scp.Devices.df.checkFocus(Scp);
+%                                 end
+%                                 if confidence < confidence_thresh
+%                                     pause(0.2)
+%                                     continue
+%                                 else
+%                                     found_focus=1;
+%                                     move_magnitude = 10000;
+%                                     if abs(move)<min_movement
+%                                         disp('Movement too small.')
+%                                         return
+%                                     end
+%                                     while (abs(move) < move_magnitude) & (abs(move) > min_movement)
+%                                         Scp.move_focus(move);
+%                                         total_movement = total_movement+move;
+%                                         move_magnitude = abs(move);
+%                                         [move confidence pos] = Scp.Devices.df.checkFocus(Scp);
+%                                     end
+%                                     if confidence<confidence_thresh
+%                                         continue
+%                                     else
+%                                         Scp.good_focus_z = [Scp.good_focus_z Scp.Z];
+%                                         break
+%                                     end
+%                                 end
+%                             end
+%                             
+%                         end
+%                         if found_focus
+%                             disp('Woo hoo found course focus')
+%                             
+%                         else
+%                             Scp.Z = current_focus;
+%                             Scp.Z = ave_z;
+%                             disp('Did not have confidence in finding focus. Should implement better course find if this happens a lot.')
+%                             worked=0;
+%                             Scp.focus_fail = Scp.focus_fail+1;
+%                         end
+%                         
+%                     end
+%                     toc
+%                     %                     Scp.mmc.sleep(1);
                 case 'none'
                     disp('No autofocus used')
                     
