@@ -1304,6 +1304,7 @@ classdef (Abstract) Scope < handle
             arg.tmp = false;
             arg.experimentdata = [];
             arg.prefix = 'acq';
+            arg.postype = 'standard'; 
             arg.optimize = false;
             arg.skip=[];
             arg.relative = false;
@@ -1334,12 +1335,29 @@ classdef (Abstract) Scope < handle
             Xcntr = Plt.Xcenter;
             Ycntr = Plt.Ycenter;
             
-            %% create the position list
-            if arg.relative
-                Pos=RelativePositions;
+            %%
+            if Scp.MMversion < 1.5
+                PL = Scp.studio.getPositionList; 
             else
-                Pos=Positions;
+                PLM = Scp.studio.getPositionListManager;
+                PL = PLM.getPositionList;
             end
+            
+            switch arg.postype
+                case 'standard'
+                    Pos = Positions(PL,'axis',arg.axis);
+                case 'relative'
+                    Pos = RelativePositions(PL,'axis',arg.axis);
+                case 'beads'
+                    Pos = RelativePositionsUsingBeads(PL,'axis',arg.axis);
+            end
+            
+%             %% create the position list
+%             if arg.relative
+%                 Pos=RelativePositions;
+%             else
+%                 Pos=Positions;
+%             end
             Pos.axis = arg.axis;
             Pos.PlateType = Plt.type;
             
