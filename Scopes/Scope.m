@@ -1319,6 +1319,11 @@ classdef (Abstract) Scope < handle
                 p.add(Coordinates(i, :), strcat('Pos', num2str(i)));
             end
             Scp.Pos = p;
+            figure(3)
+            imshow(imadjust(Image));
+            hold('on');
+            scatter(column*size(Image,y)/size(Blocks,y),row*size(Image,x)/size(Blocks,x),size(Image,x)/size(Blocks,x),'s','R');
+            hold('off')
         end
         
         function imageRefPoint(Scp,Label,RefAcqData,varargin)
