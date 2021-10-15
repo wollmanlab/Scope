@@ -1231,6 +1231,96 @@ classdef (Abstract) Scope < handle
             Scp.Pos = Pos;
         end
         
+        function createPositionFromDraw(Scp,varargin)
+            arg.AcqData = AcquisitionData;
+            arg.AcqData(1).Channel = 'Brightfield';
+            arg.AcqData(1).Exposure = 10; %
+            arg.stitched_pixel_size = 10;
+            arg.output_pixel_size = 0.103;
+            arg.rotate = 90; % 90,180,270
+            arg.flip = 2; %dim
+            arg.x = 1; %dim
+            arg.y = 2; %dim
+            arg = parseVarargin(varargin,arg);
+            %% Create Positions
+            Scp.createPositionFromMM();
+            %% Acquire Low Mag
+            Scp.AutoFocusType = 'none';
+            Scp.acquire(arg.AcqData,'autoshutter', true)
+            %% Load Images and Coordinates
+            listing = dir(Scp.pth);
+            for i=1:length(listing)
+                if contains(listing(i).name,'acq')
+                    acq_name = listing(i).name;
+                end
+            end
+            md = Metadata(Scp.pth);
+            [Images, idxes] = md.stkread('Channel', arg.AcqData(1).Channel, 'acq', acq_name, 'flatfieldcorrection', false);
+            XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
+            XY_Cell = cell2mat(XY_Cell);
+            %% Stitch
+            image_pixel_sixe = Scp.PixelSize;
+            x = arg.x;
+            y = arg.y;
+            xy_min = min(XY_Cell);
+            xy_max = max(XY_Cell);
+            x_range = linspace(xy_min(x),xy_max(x)+1,round((1+xy_max(x)-xy_min(x))/arg.stitched_pixel_size));
+            y_range = linspace(xy_min(y),xy_max(y)+1,round((1+xy_max(y)-xy_min(y))/arg.stitched_pixel_size));
+            stitched = zeros(length(x_range(:)),length(y_range(:)));
+            for i=1:size(Images,3)
+                img_xy = XY_Cell(i,:);
+                img = Images(:,:,i);
+                % Correct Orientation
+                if arg.rotate~=0
+                    img = imrotate(img,arg.rotate);
+                end
+                if arg.flip~=0
+                    img = flip(img,arg.flip);
+                end
+                % Resize Image
+                shape = round(size(img)*image_pixel_sixe/arg.stitched_pixel_size);
+                img = imresize(img,shape);
+                %populate
+                x_lower_bound = round((img_xy(x)-xy_min(x))/arg.stitched_pixel_size)+1;
+                x_upper_bound = round((img_xy(x)-xy_min(x))/arg.stitched_pixel_size)+shape(x);
+                y_lower_bound = round((img_xy(y)-xy_min(y))/arg.stitched_pixel_size)+1;
+                y_upper_bound = round((img_xy(y)-xy_min(y))/arg.stitched_pixel_size)+shape(y);
+                stitched(x_lower_bound:x_upper_bound,y_lower_bound:y_upper_bound) = img;
+            end
+            figure(1)
+            imshow(imadjust(stitched));
+            %% Find ROI
+            Image = stitched;
+            figure(89) % Add instructions here
+            imshow(imadjust(Image))
+            totMask = false(size(Image));
+            h = imfreehand(gca); setColor(h,'red');
+            position = wait(h);
+            BW = createMask(h);
+            while sum(BW(:)) > 10 % less than 10 pixels is considered empty mask
+                totMask = totMask | BW;
+                h = imfreehand(gca); setColor(h,'red');
+                position = wait(h);
+                BW = createMask(h);
+            end
+            % Downsample with max so that each pixel is the size of a image in 63x
+            OutputImageSize = round((size(Images,1:2)*arg.output_pixel_size)/arg.stitched_pixel_size);
+            Blocks = imresize(totMask,[round(size(totMask,x)/OutputImageSize(x)),round(size(totMask,y)/OutputImageSize(y))]);
+            [row,column,~] = find(Blocks==1);
+            % Now go back to stage coordinates
+            output_x_range = linspace(xy_min(x),xy_max(x)+1,size(Blocks,x));
+            output_y_range = linspace(xy_min(y),xy_max(y)+1,size(Blocks,y));
+            pos_x_coords = output_x_range(row);
+            pos_y_coords = output_y_range(column);
+            % These look good!
+            Coordinates = (vertcat(pos_x_coords,pos_y_coords)');
+            p = Positions;
+            for i = 1:size(Coordinates, 1)
+                p.add(Coordinates(i, :), strcat('Pos', num2str(i)))
+            end
+            Scp.Pos = p;
+        end
+        
         function imageRefPoint(Scp,Label,RefAcqData,varargin)
            % make sure MD already exist
            % make sure Pos exist and is relative
