@@ -1316,7 +1316,7 @@ classdef (Abstract) Scope < handle
             Coordinates = (vertcat(pos_x_coords,pos_y_coords)');
             p = Positions;
             for i = 1:size(Coordinates, 1)
-                p.add(Coordinates(i, :), strcat('Pos', num2str(i)))
+                p.add(Coordinates(i, :), strcat('Pos', num2str(i)));
             end
             Scp.Pos = p;
         end
