@@ -10,17 +10,17 @@ classdef NinjaScope < Scope
         
         function Scp = NinjaScope()
             Scp@Scope();
-            addpath('C:\Fiji.app\scripts')
-            addpath('C:\Program Files\Micro-Manager-2.0gamma')
+            %addpath('C:\Fiji.app\scripts')
+            %addpath('C:\Program Files\Micro-Manager-2.0gamma')
             import mmcorej.*;
             import org.micromanager.*;
             Scp.studio = StartMMStudio('C:\Program Files\Micro-Manager-2.0gamma');
             Scp.mmc = Scp.studio.getCMMCore;
             
-            Scp.ErrorLogPth='C:\Scope\ErrorLogs';
+            Scp.ErrorLogPth='C:\GitRepos\Scope\ErrorLogs';
             
             disp('My name is Ninja and I am a microscope. ')
-            Scp.basePath = 'F:\WollmanLabEpiScopeData';
+            Scp.basePath = 'D:/Images';
             Scp.DeviceNames.Objective = 'TINosePiece';
             Scp.DeviceNames.AFoffset = 'TIPFSOffset';
             Scp.DeviceNames.LightPath = {'TILightPath','Label','Left100', 'Right100'};
@@ -41,7 +41,7 @@ classdef NinjaScope < Scope
             
             %% Flatfield
             %if strcmp(button,'Nikon')
-            Scp.FlatFieldsFileName='F:\WollmanLabEpiScopeData\FlatFieldCorrections\Flatfield.mat';
+            Scp.FlatFieldsFileName='D:\Images\FlatFieldCorrections\Flatfield.mat';
             %Scp.loadFlatFields;
             %Scp.CorrectFlatField = false;
             Scp.mmc.setProperty(Scp.DeviceNames.LightPath{1},Scp.DeviceNames.LightPath{2},Scp.DeviceNames.LightPath{4});
