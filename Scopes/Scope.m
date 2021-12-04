@@ -1232,34 +1232,40 @@ classdef (Abstract) Scope < handle
         end
         
         function createPositionFromDraw(Scp,varargin)
-            arg.AcqData = AcquisitionData;
-            arg.AcqData(1).Channel = 'Brightfield';
-            arg.AcqData(1).Exposure = 10; %
+            arg.acqdata = AcquisitionData;
+            arg.acqdata(1).Channel = 'Brightfield';
+            arg.acqdata(1).Exposure = 10; %
             arg.stitched_pixel_size = 10;
+            arg.input_pixel_size = 0.326;
             arg.output_pixel_size = 0.103;
             arg.rotate = 90; % 90,180,270
             arg.flip = 2; %dim
             arg.x = 1; %dim
             arg.y = 2; %dim
+            arg.acq_name = '';
             arg = parseVarargin(varargin,arg);
-            %% Create Positions
-            Scp.createPositionFromMM();
-            %% Acquire Low Mag
-            Scp.AutoFocusType = 'none';
-            Scp.acquire(arg.AcqData,'autoshutter', true)
-            %% Load Images and Coordinates
-            listing = dir(Scp.pth);
-            for i=1:length(listing)
-                if contains(listing(i).name,'acq')
-                    acq_name = listing(i).name;
+            if isempty(arg.acq_name)
+                %% Create Positions
+                Scp.createPositionFromMM();
+                %% Acquire Low Mag
+                %Scp.AutoFocusType = 'none';
+                Scp.acquire(arg.acqdata,'autoshutter', true)
+                %% Load Images and Coordinates
+                listing = dir(Scp.pth);
+                for i=1:length(listing)
+                    if contains(listing(i).name,'acq')
+                        acq_name = listing(i).name;
+                    end
                 end
+            else
+                acq_name = arg.acq_name;
             end
             md = Metadata(Scp.pth);
-            [Images, idxes] = md.stkread('Channel', arg.AcqData(1).Channel, 'acq', acq_name, 'flatfieldcorrection', false);
+            [Images, idxes] = md.stkread('Channel', arg.acqdata(1).Channel, 'acq', acq_name, 'flatfieldcorrection', false);
             XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
             XY_Cell = cell2mat(XY_Cell);
             %% Stitch
-            image_pixel_sixe = Scp.PixelSize;
+            image_pixel_sixe = arg.input_pixel_size;
             x = arg.x;
             y = arg.y;
             xy_min = min(XY_Cell);
@@ -1270,6 +1276,7 @@ classdef (Abstract) Scope < handle
             for i=1:size(Images,3)
                 img_xy = XY_Cell(i,:);
                 img = Images(:,:,i);
+                img = imgaussfilt(img-imgaussfilt(img,100),5); % To make features more visible % Move from hard code
                 % Correct Orientation
                 if arg.rotate~=0
                     img = imrotate(img,arg.rotate);
@@ -1287,12 +1294,17 @@ classdef (Abstract) Scope < handle
                 y_upper_bound = round((img_xy(y)-xy_min(y))/arg.stitched_pixel_size)+shape(y);
                 stitched(x_lower_bound:x_upper_bound,y_lower_bound:y_upper_bound) = img;
             end
-            figure(1)
-            imshow(imadjust(stitched));
+            stitched = stitched-prctile(stitched(:),75);
+            stitched(stitched<0) = 0;
+%             imshow(imadjust(stitched));
             %% Find ROI
+            message = ['Instructions:',newline,'Draw a ROI',newline,'Double Click on line',newline,'Repeat for all ROI',newline,'To Exit: Click on empty space',newline,'double click on same empty space to exit'];
+            h = msgbox(message);
+            set(h,'Position',[350 550 250 100])
             Image = stitched;
             figure(89) % Add instructions here
             imshow(imadjust(Image))
+            title('Draw ROI')
             totMask = false(size(Image));
             h = imfreehand(gca); setColor(h,'red');
             position = wait(h);

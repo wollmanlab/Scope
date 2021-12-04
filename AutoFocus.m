@@ -9,6 +9,7 @@ classdef (Abstract) AutoFocus < handle
         focus_reliquary = containers.Map;
         start_Z = [];
         surface_method = 'poly23';
+        alert_level = 2;
     end
     
     methods
@@ -58,8 +59,10 @@ classdef (Abstract) AutoFocus < handle
         end
         
         function AF = predictFocus(AF,Scp,varargin)
-            message = ['Autofocus didnt find focus',newline,'Attempting to Predict Focus'];
-            Scp.Notifications.sendSlackMessage(Scp,message);
+            if AF.alert_level<2
+                message = ['Autofocus didnt find focus',newline,'Attempting to Predict Focus'];
+                Scp.Notifications.sendSlackMessage(Scp,message);
+            end
             if isKey(AF.focus_reliquary,AF.current_acq)==false
                 % Use start Z
                 Scp.Z = Scp.AF.start_Z;
@@ -92,8 +95,10 @@ classdef (Abstract) AutoFocus < handle
         end
         
         function AF = scanFocus(AF,Scp,varargin)
-            message = ['Autofocus didnt find focus',newline,'Attempting to Scan for Focus'];
-            Scp.Notifications.sendSlackMessage(Scp,message);
+            if AF.alert_level<3
+                message = ['Autofocus didnt find focus',newline,'Attempting to Scan for Focus'];
+                Scp.Notifications.sendSlackMessage(Scp,message);
+            end
             dZ = linspace(-AF.lower_z, AF.upper_z, 1+(AF.lower_z+AF.upper_z)/AF.step);
             current_Z = Scp.Z;
             for i = 1:length(dZ)
