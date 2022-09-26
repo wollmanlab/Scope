@@ -21,7 +21,7 @@ classdef (Abstract) AutoFocus < handle
             % If Focus wasnt found
             if ~AF.foundFocus
                 % Predict Focus based on past found focus 
-                AF = AF.predictFocus(Scp,varargin);
+                %AF = AF.predictFocus(Scp,varargin);
                 % Check Focus
                 AF = AF.checkFocus(Scp,varargin);
                 % If Focus wasnt found
@@ -59,10 +59,11 @@ classdef (Abstract) AutoFocus < handle
         end
         
         function AF = predictFocus(AF,Scp,varargin)
+            message = ['Autofocus didnt find focus',newline,'Attempting to Predict Focus'];
             if AF.alert_level<2
-                message = ['Autofocus didnt find focus',newline,'Attempting to Predict Focus'];
                 Scp.Notifications.sendSlackMessage(Scp,message);
             end
+            disp(message)
             if isKey(AF.focus_reliquary,AF.current_acq)==false
                 % Use start Z
                 Scp.Z = Scp.AF.start_Z;
@@ -95,10 +96,11 @@ classdef (Abstract) AutoFocus < handle
         end
         
         function AF = scanFocus(AF,Scp,varargin)
+            message = ['Autofocus didnt find focus',newline,'Attempting to Scan for Focus'];
             if AF.alert_level<3
-                message = ['Autofocus didnt find focus',newline,'Attempting to Scan for Focus'];
                 Scp.Notifications.sendSlackMessage(Scp,message);
             end
+            disp(message)
             dZ = linspace(-AF.lower_z, AF.upper_z, 1+(AF.lower_z+AF.upper_z)/AF.step);
             current_Z = Scp.Z;
             for i = 1:length(dZ)
@@ -114,6 +116,7 @@ classdef (Abstract) AutoFocus < handle
         function AF = askForHelp(AF,Scp,varargin)
             message = ['Autofocus didnt find focus and Needs Help',newline,'Turn On Live',newline,'Manually Find Focus',newline,'Then Click OK'];
             Scp.Notifications.sendSlackMessage(Scp,message);
+            disp(message)
             uiwait(msgbox(message));
         end
     end

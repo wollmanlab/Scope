@@ -9,7 +9,7 @@ classdef HypeScope < Scope
         currentHybe = '';
         acqname = '';
         BeadFocus;
-        AF = AutoFocusOfTheseus;
+        AF = TheseusFocus;
         LargeMove = 500; % large movement, i.e. break the move into steps and autofocus in between 
         Notifications = Notifications;
     end
