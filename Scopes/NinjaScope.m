@@ -228,7 +228,8 @@ classdef NinjaScope < Scope
                 case 'none'
                     disp('No autofocus used');
                 case 'hardware'
-                    Scp.AF = Scp.AF.findFocus(Scp);
+                    [Scp.AF,Pos] = Scp.AF.findFocus(Scp);
+                    Scp.Pos = Pos;
                 case 'software'
                     if length(AcqData)~=1
                         error('autofocus can only get a single channel!')
