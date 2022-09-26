@@ -25,8 +25,15 @@ classdef Notifications
         end
         
         function sendSlackMessage(A,Scp,message,varargin)
+            arg.all = false;
+            arg = parseVarargin(varargin,arg);
             [user,hook] = A.populateSlackAddresses(Scp);
-            if isempty(user)
+            if arg.all
+                status = SendSlackNotification(hook,message);
+                if strcmp(status,'ok')==0
+                    msgbox([message,newline,'Slack Hook not set up correctly'])
+                end
+            elseif isempty(user)
                 message = [message,newline,Scp.Username];
                 status = SendSlackNotification(hook,message);
                 if strcmp(status,'ok')==0
