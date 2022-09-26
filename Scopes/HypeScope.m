@@ -205,6 +205,8 @@ classdef HypeScope < Scope
             
             
             switch lower(Scp.AutoFocusType)
+                case 'nuclei'
+                    Scp.AF = Scp.AF.findFocus(Scp);
                 case 'theseus'
                     Scp.AF = Scp.AF.findFocus(Scp);
                 case 'relative'
