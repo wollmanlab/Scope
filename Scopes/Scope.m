@@ -1427,7 +1427,7 @@ classdef (Abstract) Scope < handle
         end
 
         function [Pos,Xwell,Ywell] = createPositions(Scp,varargin)
-
+            
             Plt = Scp.Chamber;
             Scp.currentAcq=Scp.currentAcq+1;
             arg.msk = true(Plt.sz);
@@ -2082,7 +2082,7 @@ classdef (Abstract) Scope < handle
             try
                 Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
                 %Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','Focus'));
-                Scp.waitForZStage()
+                Scp.waitForZStage(Z)
             catch e
                 warning('failed to move Z with error: %s',e.message);
             end
@@ -2184,14 +2184,29 @@ classdef (Abstract) Scope < handle
             iter=0;
             currXY = Scp.XY;
             dist = sqrt(sum((currXY(:)-XY(:)).^2));
-            while dist > Scp.XYpercision || iter > 60000
-                pause(0.001)
+            dt = 0.1;%s
+            max_time = 5;%s
+            max_iter = max_time/dt;
+            while dist > Scp.XYpercision & iter <= max_iter
+                pause(dt)
                 currXY = Scp.XY;
                 dist = sqrt(sum((currXY(:)-XY(:)).^2));
                 iter=iter+1;
             end
-            if iter > 60000
-                error('error in movement')
+            if iter > max_iter
+                try
+                    message = 'Stage is not able to get to this position (XY) Need Help';
+                    Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+                    answer = questdlg(['Stage is not able to get to this position',newline,'If Position Is not Good Click Hide'], ...
+                        'Stage Needs Help', ...
+                        'Okay','Hide','');
+                    switch answer
+                        case 'Hide'
+                            Scp.Pos.Hidden(Scp.Pos.current) = 1;
+                    end
+                catch
+                    error('error in movement')
+                end
             end
         end
 
@@ -2199,14 +2214,29 @@ classdef (Abstract) Scope < handle
             iter=0;
             currZ = Scp.Z;
             dist = sqrt(sum((currZ-Z).^2));
-            while dist > Scp.Zpercision || iter > 60000
-                pause(0.001)
+            max_time = 5; %s
+            dt = 0.1;%s
+            max_iter = max_time/dt;
+            while dist > Scp.Zpercision & iter <= max_iter
+                pause(dt)
                 currZ = Scp.Z;
                 dist = sqrt(sum((currZ-Z).^2));
                 iter=iter+1;
             end
-            if iter > 60000
-                error('error in movement')
+            if iter > max_iter
+                try
+                    message = 'Stage is not able to get to this position (Z) Need Help';
+                    Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+                    answer = questdlg(['Stage is not able to get to this position',newline,'If Position Is not Good Click Hide'], ...
+                        'Stage Needs Help', ...
+                        'Okay','Hide','');
+                    switch answer
+                        case 'Hide'
+                            Scp.Pos.Hidden(Scp.Pos.current) = 1;
+                    end
+                catch
+                    error('error in movement')
+                end
             end
         end
 
