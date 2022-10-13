@@ -159,3 +159,5 @@ classdef NucleiFocus < AutoFocus
             Scp.Z = Zfocus;
             contF=AF.calcMetric(Scp);
         end
+    end
+end
