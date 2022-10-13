@@ -3,7 +3,7 @@ classdef (Abstract) AutoFocus < handle
         lower_z = 50;
         upper_z = 50;
         step = 10;
-        pause = 1;
+        pause = 0.1;
         foundFocus = false;
         current_acq = 'default';
         focus_reliquary = containers.Map;
@@ -138,11 +138,10 @@ classdef (Abstract) AutoFocus < handle
             switch answer
                 case 'Hide'
                     % Hide Current Position
-                    current_xy = Scp.XY;
-                    Distance = pdist2(current_xy, Scp.Pos.List);
-                    [value, index] = min(Distance,[], 2);
-                    Scp.Pos.Hidden(index) = 1;
-                    
+%                     current_xy = Scp.XY;
+%                     Distance = pdist2(current_xy, Scp.Pos.List);
+%                     [value, index] = min(Distance,[], 2);
+                    Scp.Pos.Hidden(Scp.Pos.current) = 1;
             end
             Pos = Scp.Pos;
 

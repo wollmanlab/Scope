@@ -227,6 +227,9 @@ classdef NinjaScope < Scope
             switch lower(Scp.AutoFocusType)
                 case 'none'
                     disp('No autofocus used');
+                case 'nuclei'
+                    [Scp.AF,Pos] = Scp.AF.findFocus(Scp);
+                    Scp.Pos = Pos;
                 case 'hardware'
                     [Scp.AF,Pos] = Scp.AF.findFocus(Scp);
                     Scp.Pos = Pos;

@@ -108,6 +108,8 @@ classdef (Abstract) Scope < handle
         %% Percision XY
         XYpercision = 10; % microns
         dXY = [0 0];
+        Zpercision = 0.25; % microns
+
 
         %% Magnification
         Optovar = 1;
@@ -1425,7 +1427,7 @@ classdef (Abstract) Scope < handle
         end
 
         function [Pos,Xwell,Ywell] = createPositions(Scp,varargin)
-
+            
             Plt = Scp.Chamber;
             Scp.currentAcq=Scp.currentAcq+1;
             arg.msk = true(Plt.sz);
@@ -2079,7 +2081,8 @@ classdef (Abstract) Scope < handle
             %             end
             try
                 Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
-                Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','Focus'));
+                %Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','Focus'));
+                Scp.waitForZStage(Z)
             catch e
                 warning('failed to move Z with error: %s',e.message);
             end
@@ -2099,7 +2102,8 @@ classdef (Abstract) Scope < handle
 
         function setX(Scp,X)
             Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,X,Scp.Y)
-            Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+            %Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+            Scp.waitForXYStage([X Scp.Y])
         end
 
         function set.X(Scp,X)
@@ -2116,7 +2120,8 @@ classdef (Abstract) Scope < handle
 
         function setY(Scp,Y)
             Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,Scp.X,Y)
-            Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+            %Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+            Scp.waitForXYStage([Scp.X Y])
         end
 
         function XY = get.XY(Scp)
@@ -2175,6 +2180,66 @@ classdef (Abstract) Scope < handle
 
         end
 
+        function waitForXYStage(Scp,XY)
+            iter=0;
+            currXY = Scp.XY;
+            dist = sqrt(sum((currXY(:)-XY(:)).^2));
+            dt = 0.1;%s
+            max_time = 5;%s
+            max_iter = max_time/dt;
+            while dist > Scp.XYpercision & iter <= max_iter
+                pause(dt)
+                currXY = Scp.XY;
+                dist = sqrt(sum((currXY(:)-XY(:)).^2));
+                iter=iter+1;
+            end
+            if iter > max_iter
+                try
+                    message = 'Stage is not able to get to this position (XY) Need Help';
+                    Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+                    answer = questdlg(['Stage is not able to get to this position',newline,'If Position Is not Good Click Hide'], ...
+                        'Stage Needs Help', ...
+                        'Okay','Hide','');
+                    switch answer
+                        case 'Hide'
+                            Scp.Pos.Hidden(Scp.Pos.current) = 1;
+                    end
+                catch
+                    error('error in movement')
+                end
+            end
+        end
+
+        function waitForZStage(Scp,Z)
+            iter=0;
+            currZ = Scp.Z;
+            dist = sqrt(sum((currZ-Z).^2));
+            max_time = 5; %s
+            dt = 0.1;%s
+            max_iter = max_time/dt;
+            while dist > Scp.Zpercision & iter <= max_iter
+                pause(dt)
+                currZ = Scp.Z;
+                dist = sqrt(sum((currZ-Z).^2));
+                iter=iter+1;
+            end
+            if iter > max_iter
+                try
+                    message = 'Stage is not able to get to this position (Z) Need Help';
+                    Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+                    answer = questdlg(['Stage is not able to get to this position',newline,'If Position Is not Good Click Hide'], ...
+                        'Stage Needs Help', ...
+                        'Okay','Hide','');
+                    switch answer
+                        case 'Hide'
+                            Scp.Pos.Hidden(Scp.Pos.current) = 1;
+                    end
+                catch
+                    error('error in movement')
+                end
+            end
+        end
+
         function setXY(Scp,XY)
             currXY = Scp.XY;
             dist = sqrt(sum((currXY(:)-XY(:)).^2));
@@ -2184,11 +2249,15 @@ classdef (Abstract) Scope < handle
             end
             try % Timeout error on hype scope where um misses task completely signal
                 Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
-                Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+                
+                % MMC wait for device doesn't work
+                %Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+                Scp.waitForXYStage(XY)
             catch % try again
                 disp('Error during stage movement. Trying again')
                 Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
-                Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+                %Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+                Scp.waitForXYStage(XY)
             end
         end
 

@@ -1,11 +1,11 @@
 classdef NucleiFocus < AutoFocus
     properties
-        verbose=false;
+        verbose=true;
         channel = 'DeepBlue';
         exposure = 50;
         Pos;
         B;
-        dZ = 250;
+        dZ = 50;
         max_dZ = 500;
         resolution=1;
         n_neighbors = 10;
@@ -159,5 +159,44 @@ classdef NucleiFocus < AutoFocus
             Scp.Z = Zfocus;
             contF=AF.calcMetric(Scp);
         end
+
+        function metric = calcMetric(AF,Scp)
+            % snap an image
+            Scp.Channel=AF.channel;
+            Scp.Exposure=AF.exposure;
+            % False will acq a Z stack per color.
+            if AF.resize~=1
+                img=imresize(Scp.snapImage, AF.resize);
+            else
+                img = Scp.snapImage;
+            end
+            % calculate metric
+            switch lower(AF.metric)
+                case 'sobel'
+                    hx = fspecial('sobel');
+                    hy = fspecial('sobel')';
+                    gx=imfilter(img,hx);
+                    gy=imfilter(img,hy);
+                    metric=mean(hypot(gx(:),gy(:)));
+                case 'contrast' 
+                    if AF.scale>0
+                        m=img-imgaussfilt(img,AF.scale);
+                    else
+                        m=img;
+                    end
+                    rng=prctile(m(:),[1 99]);
+                    metric=rng(2)-rng(1);
+                case 'contrast_1d'
+                    img = cat(1,[max(img),max(img')]);
+                    if AF.scale>0
+                        m=img-imgaussfilt(img,AF.scale);
+                    else
+                        m=img;
+                    end
+                    rng=prctile(m(:),[1 99]);
+                    metric=rng(2)-rng(1);
+            end
+        end
+
     end
 end
