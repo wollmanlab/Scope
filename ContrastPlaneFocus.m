@@ -25,6 +25,7 @@ classdef ContrastPlaneFocus < NucleiFocus
             XYZ(:,1:2) = AF.Pos.List(:,1:2);
             last_XY = Scp.XY;
             for p=1:size(AF.Pos.List,1)
+                disp([int2str(p),' of ',int2str(size(AF.Pos.List,1))])
                 dist = sqrt(sum((Scp.XY-last_XY).^2));
 %                 Scp.goto(AF.Pos.Labels{p}, AF.Pos)
                 Scp.XY = AF.Pos.List(p,1:2);
@@ -53,6 +54,7 @@ classdef ContrastPlaneFocus < NucleiFocus
             XYZ = zeros(size(sites,1),3);
             XYZ(:,1:2) = AF.Pos.List(sites,1:2);
             for p=1:size(sites,1)
+                disp([int2str(p),' of ',int2str(size(sites,1))])
                 Scp.XY = AF.Pos.List(sites(p),1:2);
                 pause(1)
                 Scp.Z = AF.Pos.List(sites(p),3); 
