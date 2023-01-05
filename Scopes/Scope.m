@@ -16,6 +16,8 @@ classdef (Abstract) Scope < handle
         CurrentDatastore;
         Strobbing = false;
 
+        ContinousImaging = false;
+
         %% imaging properties
         Binning=1;
 
@@ -254,12 +256,14 @@ classdef (Abstract) Scope < handle
             end
 
             % set baseZ to allow dZ between channels
-            baseZ=Scp.Z;
-
-            % get XY to save in metadata
-
-            XY = Scp.XY; %#ok<PROPLC>
-            Z=Scp.Z;  %#ok<PROPLC>
+            if ~isempty(cat(1,AcqData.dZ))
+                baseZ=Scp.Z;
+            else 
+                baseZ = nan; 
+            end
+            % get XY to save in metadata from position list
+%             XY = Scp.XY; %#ok<PROPLC>
+            XY = round(Scp.Pos.List(Scp.Pos.current,:));%#ok<PROPLC>
 
             n = numel(AcqData);
             ix=zeros(n,1);
@@ -290,7 +294,7 @@ classdef (Abstract) Scope < handle
                 end
 
                 %% update Scope state
-                if ~TriggeredChannels(i)
+                if ~TriggeredChannels(i) && length(AcqData)>1
                     Scp.updateState(AcqData(i)); % set scope using all fields of AcqData including channel, dZ, exposure etc.
                 end
                 Scp.TimeStamp='updateState';
@@ -392,10 +396,9 @@ classdef (Abstract) Scope < handle
                 T(i)=now; % to save in metadata
 
                 % return Z to baseline
-                Zformd=Scp.Z; % for record keeping
+                Zformd=baseZ; % for record keeping
                 if ~isempty(AcqData(i).dZ) && AcqData(i).dZ~=0 % only move if dZ was not empty;
                     Scp.Z=baseZ;
-                    Z=baseZ; %#ok<PROPLC>
                 end
 
                 %% deal with metadata of scope parameters
@@ -655,6 +658,7 @@ classdef (Abstract) Scope < handle
             arg.dooncepertimepoint = {};
             arg.calibrate = false;
             arg.autoshutter = true;
+            arg.continousimaging = false;
             %arg.delay = false;
             arg = parseVarargin(varargin,arg);
 
@@ -673,6 +677,17 @@ classdef (Abstract) Scope < handle
             if Scp.Strobbing
                 Scp.prepareProcessingFilesBefore(AcqData);
             end
+
+            %% start camera (if asked for and only single channel)
+            if arg.continousimaging && length(AcqData)==1 && AcqData(1).Exposure<100
+                Scp.ContinousImaging = true; 
+                Scp.mmc.stopSequenceAcquisition()
+                Scp.mmc.startContinuousSequenceAcquisition(0)
+            end
+            % update state to the first acqdata in case tehre is only one
+            % channel and then we won't update this in acqFrame to save
+            % time
+            Scp.updateState(AcqData(1))
 
             %% Add channel sequence to trigger device (if any)
             Scp.setTriggerChannelSequence(AcqData);
@@ -724,6 +739,10 @@ classdef (Abstract) Scope < handle
                 Scp.MD.saveMetadata(fullfile(Scp.pth,acqname));
             end
 
+            if arg.continousimaging
+                Scp.mmc.stopSequenceAcquisition()
+                Scp.ContinousImaging = false; 
+            end
 
         end
 
@@ -870,9 +889,13 @@ classdef (Abstract) Scope < handle
 
                 %% adjust position shift
                 [dX,dY,dZ] = Scp.parseShiftFile;
-                Scp.X = Scp.X+dX;
-                Scp.Y = Scp.Y+dY;
-                if dZ>0
+                if dX>Scp.XYpercision
+                    Scp.X = Scp.X+dX;
+                end
+                if dY>Scp.XYpercision
+                    Scp.Y = Scp.Y+dY;
+                end
+                if dZ>Scp.Zpercision
                     Scp.Z = Scp.Z+dZ;
                 end
 
@@ -1089,12 +1112,12 @@ classdef (Abstract) Scope < handle
             if ifMulti
                 label = label(1:ifMulti(1)-1);
             end
-            if ~Scp.Strobbing
-                err =~strcmp(Scp.whereami,label); %return err=1 if end position doesnt match label
-                if err
-                    warning('stage position doesn`t match label')
-                end
-            end
+%             if ~Scp.Strobbing
+%                 err =~strcmp(Scp.whereami,label); %return err=1 if end position doesnt match label
+%                 if err
+%                     warning('stage position doesn`t match label')
+%                 end
+%             end
         end
 
         function when = getTimeStamp(Scp,what)
@@ -1239,8 +1262,8 @@ classdef (Abstract) Scope < handle
 
         function createPositionFromDraw(Scp,varargin)
             arg.acqdata = AcquisitionData;
-            arg.acqdata(1).Channel = 'Brightfield';
-            arg.acqdata(1).Exposure = 10; %
+            arg.acqdata(1).Channel = 'DeepBlue';
+            arg.acqdata(1).Exposure = 50; %
             arg.stitched_pixel_size = 10;
             arg.input_pixel_size = 0.326;
             arg.output_pixel_size = 0.103;
@@ -1251,13 +1274,14 @@ classdef (Abstract) Scope < handle
             arg.y = 2; %dim
             arg.image_thresh = 0;
             arg.small_object_thesh = 500;
-            args.dialate_size = 1000;
+            args.dialate_size = 75;
             arg.acq_name = '';
+            arg.overlap = 0;
             arg = parseVarargin(varargin,arg);
             if isempty(arg.acq_name)
                 %% Create Positions
                 Scp.createPositionFromMM();
-                Scp.Pos.optimizeOrder;
+                %Scp.Pos.optimizeOrder;
                 %% Acquire Low Mag
                 %Scp.AutoFocusType = 'none';
                 Scp.acquire(arg.acqdata,'autoshutter', true)
@@ -1278,7 +1302,6 @@ classdef (Abstract) Scope < handle
             XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
             XY_Cell = cell2mat(XY_Cell);
             %% Stitch
-            image_pixel_sixe = arg.input_pixel_size;
             x = arg.x;
             y = arg.y;
             border = 3000; %um
@@ -1301,19 +1324,19 @@ classdef (Abstract) Scope < handle
                     img = flip(img,arg.flip);
                 end
                 % Resize Image
-                shape = round(size(img)*image_pixel_sixe/arg.stitched_pixel_size);
+                shape = round(size(img)*arg.input_pixel_size/arg.stitched_pixel_size);
                 img = imresize(img,shape);
                 %populate
-                x_lower_bound = round((img_xy(x)-xy_min(x))/arg.stitched_pixel_size)+1;
-                x_upper_bound = round((img_xy(x)-xy_min(x))/arg.stitched_pixel_size)+shape(x);
-                y_lower_bound = round((img_xy(y)-xy_min(y))/arg.stitched_pixel_size)+1;
-                y_upper_bound = round((img_xy(y)-xy_min(y))/arg.stitched_pixel_size)+shape(y);
+                x_lower_bound = round((img_xy(x)-xy_min(x))/arg.stitched_pixel_size)+1-(shape(x)/2);
+                x_upper_bound = round((img_xy(x)-xy_min(x))/arg.stitched_pixel_size)+(shape(x)/2);
+                y_lower_bound = round((img_xy(y)-xy_min(y))/arg.stitched_pixel_size)+1-(shape(y)/2);
+                y_upper_bound = round((img_xy(y)-xy_min(y))/arg.stitched_pixel_size)+(shape(y)/2);
                 old_img = stitched(x_lower_bound:x_upper_bound,y_lower_bound:y_upper_bound);
                 merge = cat(3,old_img,img);
                 merge = max(merge,[],3);
                 stitched(x_lower_bound:x_upper_bound,y_lower_bound:y_upper_bound) = merge;
             end
-            stitched = stitched-prctile(stitched(:),75);
+            stitched = stitched-prctile(stitched(:),50);
             stitched(stitched<0) = 0;
             %             imshow(imadjust(stitched));
             if arg.image_thresh>0
@@ -1328,28 +1351,45 @@ classdef (Abstract) Scope < handle
 
                 %% Find ROI By Binarizing Stitched
             else
-                %% Find ROI
-                message = ['Instructions:',newline,'Draw a ROI',newline,'Double Click on line',newline,'Repeat for all ROI',newline,'To Exit: Click on empty space',newline,'double click on same empty space to exit'];
-                h = msgbox(message);
-                set(h,'Position',[350 550 250 100])
-                Image = stitched;
-                figure(89) % Add instructions here
-                imshow(imadjust(Image))
-                title('Draw ROI')
-                totMask = false(size(Image));
-                h = imfreehand(gca); setColor(h,'red');
-                position = wait(h);
-                BW = createMask(h);
-                while sum(BW(:)) > 10 % less than 10 pixels is considered empty mask
-                    totMask = totMask | BW;
+                satisfied = false;
+                while ~satisfied
+                    %% Find ROI
+                    message = ['Instructions:',newline,'Draw a ROI',newline,'Double Click on line',newline,'Repeat for all ROI',newline,'To Exit: Click on empty space',newline,'double click on same empty space to exit'];
+                    h = msgbox(message);
+                    set(h,'Position',[350 550 250 100])
+                    Image = stitched;
+                    figure(89) % Add instructions here
+                    imshow(imadjust(Image))
+                    title('Draw ROI')
+                    totMask = false(size(Image));
                     h = imfreehand(gca); setColor(h,'red');
                     position = wait(h);
                     BW = createMask(h);
+                    while sum(BW(:)) > 10 % less than 10 pixels is considered empty mask
+                        totMask = totMask | BW;
+                        h = imfreehand(gca); setColor(h,'red');
+                        position = wait(h);
+                        BW = createMask(h);
+                    end
+                    answer = questdlg(['Are you happy with your drawing skills?',newline,'If Position Is not Good Click Hide'], ...
+                        'Happy?', ...
+                        'Yes','No','No');
+                    switch answer
+                        case 'Yes'
+                            satisfied = true;
+                    end
                 end
             end
-            % Downsample with max so that each pixel is the size of a image in 63x
+            % Downsample with max so that each pixel is the size of a image
+            % Adjust for overlap
+            arg.output_pixel_size = arg.output_pixel_size*(1-arg.overlap);
+            % Dialate to ensure you capture everything
+            SE = strel("disk",args.dialate_size,8);
+            totMask = imdilate(totMask,SE);
+            % in output magnification
             OutputImageSize = round((size(Images,1:2)*arg.output_pixel_size)/arg.stitched_pixel_size);
-            Blocks = imresize(totMask,[round(size(totMask,x)/OutputImageSize(y)),round(size(totMask,y)/OutputImageSize(x))]);
+            % causing weird rounding issue?
+            Blocks = imresize(totMask,[round(size(totMask,x)/OutputImageSize(y)),round(size(totMask,y)/OutputImageSize(x))],"nearest","Antialiasing",false);
             [row,column,~] = find(Blocks==1);
             % Now go back to stage coordinates
             output_x_range = linspace(xy_min(x),xy_max(x)+1,size(Blocks,x));
@@ -1366,9 +1406,209 @@ classdef (Abstract) Scope < handle
             figure(3)
             imshow(imadjust(Image));
             hold('on');
-            scatter(column*size(Image,y)/size(Blocks,y),row*size(Image,x)/size(Blocks,x),size(Image,x)/size(Blocks,x),'s','R');
+            scatter((column-1)*size(Image,y)/size(Blocks,y),(row)*size(Image,x)/size(Blocks,x),7.5*size(Image,x)/size(Blocks,x),'s','R');
             hold('off')
         end
+
+        %% Create Positions via Plate or MM (done outside of Function)
+        function Scp = filterPositionsByDraw(Scp,varargin)
+            arg.acqdata = AcquisitionData;
+            arg.acqdata(1).Channel = 'DeepBlue';
+            arg.acqdata(1).Exposure = 10; %
+            arg.stitched_pixel_size = 10;
+            arg.pixel_size = 0.490;
+            arg.rotate = 90;
+            arg.background = false;
+            arg.flip = 0; %dim
+            arg.border = 500;
+            arg.thresh = 0;
+            arg.x = 1; %dim
+            arg.y = 2; %dim
+            arg.verbose=true;
+            arg.acq_name = '';
+            arg.groups = true;
+            arg = parseVarargin(varargin,arg);
+
+            if isempty(arg.acq_name)
+                %% Acquire Low Mag
+                %Scp.AutoFocusType = 'none';
+                Scp.acquire(arg.acqdata,'autoshutter', false)
+                %% Load Images and Coordinates
+                listing = dir(Scp.pth);
+                for i=1:length(listing)
+                    if contains(listing(i).name,'acq')
+                        acq_name = listing(i).name;
+                    end
+                end
+            else
+                acq_name = arg.acq_name;
+            end
+
+            %% Load and Stitch
+            md = Metadata(Scp.pth);
+            [Images, idxes] = md.stkread('acq', acq_name, 'flatfieldcorrection', false);
+            XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
+            Posnames_Cell = md.getSpecificMetadataByIndex('Position', idxes);
+            stitched = Scp.stitch(Images,XY_Cell, ...
+                'pixel_size',arg.pixel_size, ...
+                'rotate',arg.rotate, ...
+                'flip',arg.flip, ...
+                'border',arg.border, ...
+                'x',arg.x, ...
+                'y',arg.y);
+            if arg.verbose
+                figure(10)
+                imshow(imadjust(stitched))
+            end
+            %% Draw Masks
+            mask = Scp.drawMask(stitched);
+            if arg.verbose
+                figure(11)
+                imshow(mask)
+            end
+            %% Label mask
+            labelMask = bwlabel(mask);
+            %% Hide Positions and Relabel
+            keepers = zeros(size(Images,3),1);
+            updated_posnames = cell(size(Images,3),1);
+            x = arg.x;
+            y = arg.y;
+            XY_coordinates = round((cell2mat(XY_Cell)-min(cell2mat(XY_Cell)))/10)+1;
+            XY_Limits = max(XY_coordinates)+arg.border;
+
+            for i=1:size(Images,3)
+                img_coordinates = XY_coordinates(i,:);
+                img = Images(:,:,i);
+                % Correct Orientation
+                if arg.rotate~=0
+                    img = imrotate(img,arg.rotate);
+                end
+                if arg.flip~=0
+                    img = flip(img,arg.flip);
+                end
+                % Resize Image
+                shape = round(size(img)*arg.pixel_size/arg.stitched_pixel_size)-1;
+                %populate
+                x_lower_bound = img_coordinates(x);
+                x_upper_bound = x_lower_bound+shape(x);
+                y_lower_bound = img_coordinates(y);
+                y_upper_bound = y_lower_bound+shape(y);
+                old_img = labelMask(x_lower_bound:x_upper_bound,y_lower_bound:y_upper_bound);
+                if max(max(old_img(:)))>0
+                    keepers(i) = 1;
+                else
+                    stitched(x_lower_bound:x_upper_bound,y_lower_bound:y_upper_bound) = 0;
+                    keepers(i) = 0;
+                end
+                % Update name
+                posname = Posnames_Cell{i};
+                if contains(posname,'-Pos')
+                    posname = strsplit(posname,'-Pos');
+                elseif contains(posname,'_site')
+                    posname = strsplit(posname,'_site');
+                else
+                    posname = {'unknown',posname};
+                end
+                updated_posnames{i} = ['Well',posname{1},'-Section',int2str(max(old_img(:))),'-Pos',posname{2}];
+            end
+            good_posnames = Posnames_Cell(keepers==1);
+            good_updated_posnames = updated_posnames(keepers==1);
+            hidden = Scp.Pos.Hidden;
+            updated_Pos_Labels = Scp.Pos.Labels;
+            for i=1:size(Scp.Pos.Labels,1)
+                m = strcmp(good_posnames,Scp.Pos.Labels(i));
+                if any(m)
+                    updated_Pos_Labels{i} = good_updated_posnames{m};
+                else
+                    hidden(i) = 1;
+                end
+            end
+            Scp.Pos.Labels = updated_Pos_Labels;
+            Scp.Pos.Hidden = hidden;
+            if arg.verbose
+                figure(12)
+                imshow(imadjust(stitched))
+            end
+        end
+
+        function stitched = stitch(Scp,Images,XY_Cell,varargin)
+            arg.stitched_pixel_size = 10;
+            arg.pixel_size = 0.490;
+            arg.rotate = 90;
+            arg.background = false;
+            arg.flip = 0; %dim
+            arg.x = 1; %dim
+            arg.y = 2; %dim
+            arg.border = 500;
+            arg = parseVarargin(varargin,arg);
+            x = arg.x;
+            y = arg.y;
+            XY_coordinates = round((cell2mat(XY_Cell)-min(cell2mat(XY_Cell)))/10)+1;
+            XY_Limits = max(XY_coordinates)+arg.border;
+            stitched = zeros(XY_Limits(x),XY_Limits(y));
+%             f = waitbar(0, 'Starting');
+            for i=1:size(Images,3)
+%                 waitbar(i/size(Images,3), f, sprintf('Progress: %d %%', floor(i/size(Images,3)*100)));
+                img_coordinates = XY_coordinates(i,:);
+                img = Images(:,:,i);
+                % Correct Orientation
+                if arg.rotate~=0
+                    img = imrotate(img,arg.rotate);
+                end
+                if arg.flip~=0
+                    img = flip(img,arg.flip);
+                end
+                % Resize Image
+                shape = round(size(img)*arg.pixel_size/arg.stitched_pixel_size)-1;
+                img = imresize(img,shape+1);
+
+                %populate
+                x_lower_bound = img_coordinates(x);
+                x_upper_bound = x_lower_bound+shape(x);
+                y_lower_bound = img_coordinates(y);
+                y_upper_bound = y_lower_bound+shape(y);
+                old_img = stitched(x_lower_bound:x_upper_bound,y_lower_bound:y_upper_bound);
+                merge = cat(3,old_img,img);
+                merge = max(merge,[],3);
+                stitched(x_lower_bound:x_upper_bound,y_lower_bound:y_upper_bound) = merge;
+            end
+        end
+
+        function mask = drawMask(Scp,Image,varargin)
+            arg.remove_borders = true;
+            arg = parseVarargin(varargin,arg);
+            if arg.remove_borders
+                final_mask = zeros(size(Image));
+            end
+            satisfied = false;
+            while ~satisfied
+                % Find ROI
+                message = ['Instructions:',newline,'Draw a ROI',newline,'Double Click on line',newline,'Repeat for all ROI',newline,'To Exit: Click on empty space',newline,'double click on same empty space to exit'];
+                h = msgbox(message);
+                set(h,'Position',[350 550 250 100])
+                figure(89) % Add instructions here
+                imshow(imadjust(Image))
+                title('Draw ROI')
+                mask = false(size(Image));
+                h = imfreehand(gca); setColor(h,'red');
+                position = wait(h);
+                BW = createMask(h);
+                while sum(BW(:)) > 10 % less than 10 pixels is considered empty mask
+                    mask = mask | BW;
+                    h = imfreehand(gca); setColor(h,'red');
+                    position = wait(h);
+                    BW = createMask(h);
+                end
+                answer = questdlg(['Are you happy with your drawing skills?',newline,'If Position Is not Good Click Hide'], ...
+                    'Happy?', ...
+                    'Yes','No','No');
+                switch answer
+                    case 'Yes'
+                        satisfied = true;
+                end
+            end
+        end
+
 
         function imageRefPoint(Scp,Label,RefAcqData,varargin)
             % make sure MD already exist
@@ -1467,6 +1707,14 @@ classdef (Abstract) Scope < handle
                 cumsum(repmat(dlta(2), 1, arg.sitesperwell(2))));
             Xwell=flipud(Xwell(:)-mean(Xwell(:)));
             Ywell=Ywell(:)-mean(Ywell(:));
+            if strcmp(arg.sitesshape,'circle')
+                radius = mean([max(Ywell),max(Xwell)]);
+                dist = sqrt(abs(Xwell).^2 + abs(Ywell).^2);
+                keepers = ones(size(Xwell,1),1);
+                keepers(dist>radius) = 0;
+            else
+                keepers = ones(size(Xwell,1),1);
+            end
 
 
             %% now create grid for all wells asked for
@@ -1537,7 +1785,7 @@ classdef (Abstract) Scope < handle
 
 
                 %% add up to long list
-                Pos = add(Pos,WellXY,WellLabels);
+                Pos = add(Pos,WellXY(keepers==1,:),WellLabels(keepers==1));
 
             end
 
@@ -1708,7 +1956,21 @@ classdef (Abstract) Scope < handle
                 showImg = false;
             end
             % get image from Camera
-            img=commandCameraToCapture(Scp);
+            max_iter = 5;
+            iter = 1;
+            completed = false;
+            while (iter<max_iter)&(completed==false)
+                iter = iter+1;
+                try
+                    img=commandCameraToCapture(Scp);
+                    completed = true;
+                catch
+                    pause(0.5)
+                end
+                if (iter==max_iter)&(completed==false)
+                    img=commandCameraToCapture(Scp);
+                end
+            end
             %img=Scp.convertMMimgToMatlabFormat(timg); also appeaqrs inside
             %commandCameraToCapture
             if Scp.CorrectFlatField
@@ -1733,13 +1995,23 @@ classdef (Abstract) Scope < handle
         end
 
         function img=commandCameraToCapture(Scp)
-            if Scp.MMversion > 1.5
-                Scp.mmc.snapImage;
-                timg=Scp.mmc.getTaggedImage;
+            if Scp.ContinousImaging 
+                pause(Scp.Exposure*1.1/1000)
+                % next few lines should never be called (remove?)
+                while Scp.mmc.getRemainingImageCount==0
+                    pause(Scp.Exposure/3000), 
+                end
+                timg=Scp.mmc.getLastTaggedImage;
                 img=timg.pix;
             else
-                Scp.mmc.snapImage;
-                img = Scp.mmc.getImage;
+                if Scp.MMversion > 1.5
+                    Scp.mmc.snapImage;
+                    timg=Scp.mmc.getTaggedImage;
+                    img=timg.pix;
+                else
+                    Scp.mmc.snapImage;
+                    img = Scp.mmc.getImage;
+                end
             end
             img=Scp.convertMMimgToMatlabFormat(img);
             if Scp.CorrectFlatField
@@ -1750,7 +2022,8 @@ classdef (Abstract) Scope < handle
 
         function img=convertMMimgToMatlabFormat(Scp,img)
             img = double(img);%AOY and Rob, fix saturation BS.
-            img(img<0)=img(img<0)+2^Scp.BitDepth;
+            mask = img<0;
+            img(mask)=img(mask)+2^Scp.BitDepth;
             img = reshape(img,[Scp.Width Scp.Height])';
             img = mat2gray(img,[1 2^Scp.BitDepth]);
         end
@@ -1945,6 +2218,9 @@ classdef (Abstract) Scope < handle
                 Scp.TimeStamp = {'init',now};
                 return
             end
+            if Scp.reduceAllOverheadForSpeed
+                return
+            end
 
             % this will replace the last entry
             % ix = find(ismember(Scp.TimeStamp(:,1),what), 1);
@@ -2075,20 +2351,22 @@ classdef (Abstract) Scope < handle
         end
 
         function setZ(Scp,Z)
-            currZ = Scp.Z;
-            dist = sqrt(sum((currZ-Z).^2));
-            if Scp.Zpercision >0 && dist < Scp.Zpercision
-                fprintf('movment too small - skipping Z movement\n');
-                return
-            end
+%             currZ = Scp.Z;
+%             dist = sqrt(sum((currZ-Z).^2));
+%             if Scp.Zpercision >0 && dist < Scp.Zpercision
+%                 fprintf('movment too small - skipping Z movement\n');
+%                 return
+%             end
             max_attempts = 5;
             try
                 for attempt=1:max_attempts
                     if attempt>1
-                        pause(attempt*30)
-                        message = ['Stage is not able to get to this position (Z) Attempt #',int2str(attempt)];
-                        Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+                        pause(attempt*5)
                         Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z-2)
+                        if attempt>2
+                            message = ['Stage is not able to get to this position (Z) Attempt #',int2str(attempt)];
+                            Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+                        end
                     end
                     Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
                     if Scp.checkZStage(Z)
@@ -2123,6 +2401,11 @@ classdef (Abstract) Scope < handle
             Y=Scp.mmc.getYPosition(Scp.mmc.getXYStageDevice);
         end
 
+        function XY=getXY(Scp)
+            XY2d=Scp.mmc.getXYStagePosition(Scp.mmc.getXYStageDevice);
+            XY=[XY2d.getX XY2d.getY];
+        end
+
         function setX(Scp,X)
             setXY(Scp,[X Scp.Y])
         end
@@ -2144,8 +2427,7 @@ classdef (Abstract) Scope < handle
         end
 
         function XY = get.XY(Scp)
-            XY(1)=getX(Scp);
-            XY(2)=getY(Scp);
+            XY=getXY(Scp);
             XY = round(XY); % round to the closest micron...
         end
 
@@ -2201,8 +2483,8 @@ classdef (Abstract) Scope < handle
 
         function out = checkZStage(Scp,Z)
             max_time = 10; %s
-            dt = 0.1;%s
-            max_iter = max_time/dt;
+            dt = 0.0;%s
+            max_iter = 100;
             currZ = Scp.Z;
             dist = sqrt(sum((currZ-Z).^2));
             iter=0;
@@ -2211,6 +2493,11 @@ classdef (Abstract) Scope < handle
                 currZ = Scp.Z;
                 dist = sqrt(sum((currZ-Z).^2));
                 iter=iter+1;
+                if mod(iter,25)==0
+%                     Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z-2)
+%                     pause(1)
+                    Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
+                end
             end
             out = dist<Scp.Zpercision;
             if ~out
@@ -2220,9 +2507,17 @@ classdef (Abstract) Scope < handle
         end
 
         function out = checkXYStage(Scp,XY)
+
             max_time = 10; %s
-            dt = 0.1;%s
-            max_iter = max_time/dt;
+            dt = 0.0;%s
+%             t_start = now; 
+%             while Scp.mmc.deviceBusy('TIXYDrive') && (now-t_start)*24*3600 < max_time
+%                 pause(dt)
+%             end
+%             out = ~Scp.mmc.deviceBusy('TIXYDrive'); 
+%             return
+
+            max_iter = 100;
             currXY = Scp.XY;
             dist = sqrt(sum((currXY(:)-XY(:)).^2));
             iter=0;
@@ -2241,12 +2536,12 @@ classdef (Abstract) Scope < handle
         end
 
         function setXY(Scp,XY)
-            currXY = Scp.XY;
-            dist = sqrt(sum((currXY(:)-XY(:)).^2));
-            if Scp.XYpercision >0 && dist < Scp.XYpercision
-                fprintf('movment too small - skipping XY movement\n');
-                return
-            end
+%             currXY = Scp.XY;
+%             dist = sqrt(sum((currXY(:)-XY(:)).^2));
+%             if Scp.XYpercision >0 && dist < Scp.XYpercision
+%                 fprintf('movment too small - skipping XY movement\n');
+%                 return
+%             end
             max_attempts = 5;
             try
                 for attempt=1:max_attempts

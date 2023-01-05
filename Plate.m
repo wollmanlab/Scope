@@ -29,6 +29,17 @@ classdef Plate < Chamber
                 type = 'Costar96 (3904)';
             end
             switch type
+                case 'Underwood6'
+                    P.numOfsubChambers=6;
+                    P.type = type;
+                    P.sz = [2 3];
+                    P.wellDimensions=[30000 30000];
+                    P.wellCurvature = [1 1];
+                    %P.x0y0 = [ ]; %Has to be determined by Scope stage in ScopeStartup config file
+                    P.x0y0 = [40000 -20000]; %FIX
+                    P.directionXY = [-1 1];
+                    P.wellSpacingXY = [40000 40000];
+                    P.Wells = { 'A','D','B','E','C','F'};
                 case 'Costar96 (3904)'
                     P.numOfsubChambers=96;
                     P.type = type;

@@ -4,6 +4,7 @@ classdef NinjaScope < Scope
        OptovarStatus=[];
        Notifications = Notifications;
        AF = PerfectFocus;
+       Sensor = DHT11('COM9');
     end
     
     methods

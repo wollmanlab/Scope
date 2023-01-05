@@ -6,11 +6,15 @@ classdef ContrastPlaneFocus < NucleiFocus
         function AF = checkFocus(AF,Scp,varargin)
             x = Scp.X;
             y = Scp.Y;
-            P = AF.Pos.List;
+            P = AF.Pos.List(AF.Pos.Hidden==0,:);
             [~,i] = sort(sqrt(((P(:,1)-x).^2)+((P(:,2)-y).^2)));
             P = P(i(1:AF.n_neighbors),:);
-            AF.B = [P(:,1), P(:,2), ones(size(P,1),1)] \ P(:,3);
-            Z = [x,y ones(size(1,1),1)]*AF.B;
+            if AF.n_neighbors == 1
+                Z = P(:,3);
+            else
+                AF.B = [P(:,1), P(:,2), ones(size(P,1),1)] \ P(:,3);
+                Z = [x,y ones(size(1,1),1)]*AF.B;
+            end
             Scp.Z = Z;
             AF.foundFocus = true;
         end
@@ -24,19 +28,32 @@ classdef ContrastPlaneFocus < NucleiFocus
             XYZ = zeros(size(AF.Pos.List,1),3);
             XYZ(:,1:2) = AF.Pos.List(:,1:2);
             last_XY = Scp.XY;
-            for p=1:size(AF.Pos.List,1)
-                disp([int2str(p),' of ',int2str(size(AF.Pos.List,1))])
-                dist = sqrt(sum((Scp.XY-last_XY).^2));
+            good_labels = 1:size(AF.Pos.Labels,1);
+            good_labels = good_labels(AF.Pos.Hidden==0);
+            for g=1:size(good_labels,2)
+                p=good_labels(g);
+                tic
+%                 if AF.Pos.Hidden(p)==1
+%                     continue
+%                 end
+                disp([int2str(g),' of ',int2str(size(good_labels,2))])
+%                 dist = sqrt(sum((Scp.XY-last_XY).^2));
 %                 Scp.goto(AF.Pos.Labels{p}, AF.Pos)
                 Scp.XY = AF.Pos.List(p,1:2);
-                if (p==1)|(dist>AF.distance_thresh)
-                    uiwait(msgbox(['Manually Find Focus First']))
-                end
-                last_XY = Scp.XY;
+% % % %                 if g==1
+% % % %                     % finer precise scan for first position of well
+% % % %                     focus = AF.ImageBasedFineScan(Scp);
+% % % %                 end
+
+%                 if (p==1)|(dist>AF.distance_thresh)
+%                     uiwait(msgbox(['Manually Find Focus First']))
+%                 end
+%                 last_XY = Scp.XY;
 %                 Scp.Z = AF.Pos.List(p,3);
 %                 pause(1)
                 focus = AF.ImageBasedFocusHillClimb(Scp);
                 XYZ(p,3) = focus;
+                toc
             end
             if strcmp(AF.Pos.axis{1},'XY')
                 AF.Pos.axis = {'X','Y','Z'};
@@ -48,8 +65,10 @@ classdef ContrastPlaneFocus < NucleiFocus
         function AF = updateZ(AF,Scp)
             tic
             % Go to 10% of positions and update Z 
-            n_sites = max([10,round(size(AF.Pos.Labels,1)/10)]);
-            sites = randsample(1:size(AF.Pos.Labels,1),n_sites)';
+            good_labels = 1:size(AF.Pos.Labels,1);
+            good_labels = good_labels(AF.Pos.Hidden==0);
+            n_sites = max([10,round(size(good_labels,1)/4)]);
+            sites = randsample(good_labels,n_sites)';
 
             XYZ = zeros(size(sites,1),3);
             XYZ(:,1:2) = AF.Pos.List(sites,1:2);
