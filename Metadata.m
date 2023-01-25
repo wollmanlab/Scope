@@ -923,8 +923,11 @@ classdef Metadata < handle
             V=MD.Values;
             MD.appendMetadataDSV(pth, 'Metadata.txt');
             MD.Values={};
-            
-            save(fullfile(pth,'Metadata.mat'),'MD')
+            try
+                save(fullfile(pth,'Metadata.mat'),'MD') % Permissions Errors?
+            catch
+                save(fullfile(pth,'Metadata.mat'),'MD')
+            end
             MD.Values=V;
             %MD.exportMetadata(pth);
         end

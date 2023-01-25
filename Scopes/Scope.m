@@ -58,7 +58,6 @@ classdef (Abstract) Scope < handle
         Chamber % determine what is the current chamber (plate, slide, etc) that is being imaged
 
         %% Temp/Humidity sensor
-        TempHumiditySensor
         Temperature
         Humidity
         CO2
@@ -416,8 +415,18 @@ classdef (Abstract) Scope < handle
                     grp = 'RefPoints';
                     pos = arg.refposname;
                 end
+                try
+                    Scp.TempHumiditySensor = Scp.TempHumiditySensor.updateStatus();
+                    temperature = Scp.TempHumiditySensor.temp;
+                    humidity = Scp.TempHumiditySensor.humidity;
+                catch
+                    temperature = '0';
+                    humidity = '0';
+                end
+
                 [~,xy_before_transform] = Scp.Pos.getPositionFromLabel(Scp.Pos.peek);
-                ix(i) = Scp.MD.addNewImage(filename,'Scope',class(Scp),'FlatField',Scp.CurrentFlatFieldConfig,'Position',pos,'group',grp,'acq',acqname,'frame',t,'TimestampImage',T(i),'XY',XY,'PixelSize',Scp.PixelSize,'PlateType',Scp.Chamber.type,'Z',Zformd,'Zindex',arg.z,'XYbeforeTransform',xy_before_transform); %#ok<PROPLC>
+                ix(i) = Scp.MD.addNewImage(filename,'Scope',class(Scp),'FlatField',Scp.CurrentFlatFieldConfig,'Position',pos,'group',grp,'acq',acqname,'frame',t,'TimestampImage',T(i),'XY',XY,'PixelSize',Scp.PixelSize,'PlateType',Scp.Chamber.type,'Z',Zformd,'Zindex',arg.z,'XYbeforeTransform',xy_before_transform,'Temperature',temperature,'Humidity',humidity); %#ok<PROPLC>
+%                 ix(i) = Scp.MD.addNewImage(filename,'Scope',class(Scp),'FlatField',Scp.CurrentFlatFieldConfig,'Position',pos,'group',grp,'acq',acqname,'frame',t,'TimestampImage',T(i),'XY',XY,'PixelSize',Scp.PixelSize,'PlateType',Scp.Chamber.type,'Z',Zformd,'Zindex',arg.z,'XYbeforeTransform',xy_before_transform); %#ok<PROPLC>
                 fld = fieldnames(AcqData(i));
                 for j=1:numel(fld)
                     if ~isempty(AcqData(i).(fld{j}))
@@ -1513,6 +1522,7 @@ classdef (Abstract) Scope < handle
             end
             good_posnames = Posnames_Cell(keepers==1);
             good_updated_posnames = updated_posnames(keepers==1);
+            Scp.Pos.Hidden = zeros(length(Scp.Pos.Labels),1);
             hidden = Scp.Pos.Hidden;
             updated_Pos_Labels = Scp.Pos.Labels;
             for i=1:size(Scp.Pos.Labels,1)
@@ -1551,6 +1561,10 @@ classdef (Abstract) Scope < handle
 %                 waitbar(i/size(Images,3), f, sprintf('Progress: %d %%', floor(i/size(Images,3)*100)));
                 img_coordinates = XY_coordinates(i,:);
                 img = Images(:,:,i);
+%                 %%
+%                 img = img-mean(img(:));
+%                 img = img/std(img(:));
+                %%
                 % Correct Orientation
                 if arg.rotate~=0
                     img = imrotate(img,arg.rotate);
@@ -1959,18 +1973,20 @@ classdef (Abstract) Scope < handle
             max_iter = 5;
             iter = 1;
             completed = false;
-            while (iter<max_iter)&(completed==false)
-                iter = iter+1;
-                try
-                    img=commandCameraToCapture(Scp);
-                    completed = true;
-                catch
-                    pause(0.5)
-                end
-                if (iter==max_iter)&(completed==false)
-                    img=commandCameraToCapture(Scp);
-                end
-            end
+            img=commandCameraToCapture(Scp);
+            
+%             while (iter<max_iter)&(completed==false)
+%                 iter = iter+1;
+%                 try
+%                     img=commandCameraToCapture(Scp);
+%                     completed = true;
+%                 catch
+%                     pause(0.5)
+%                 end
+%                 if (iter==max_iter)&(completed==false)
+%                     img=commandCameraToCapture(Scp);
+%                 end
+%             end
             %img=Scp.convertMMimgToMatlabFormat(timg); also appeaqrs inside
             %commandCameraToCapture
             if Scp.CorrectFlatField
@@ -2004,10 +2020,30 @@ classdef (Abstract) Scope < handle
                 timg=Scp.mmc.getLastTaggedImage;
                 img=timg.pix;
             else
+                %Scp.mmc.clearCircularBuffer()
                 if Scp.MMversion > 1.5
-                    Scp.mmc.snapImage;
-                    timg=Scp.mmc.getTaggedImage;
-                    img=timg.pix;
+                    try
+                        Scp.mmc.snapImage;
+                        timg=Scp.mmc.getTaggedImage;
+                        img=timg.pix;
+                    catch
+                        Scp.mmc.clearCircularBuffer()
+                        pause(1);
+                        command = 'Alert : Camera Failed to Snap Image';
+                        Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command],'all',true);
+                        try
+                            Scp.mmc.snapImage;
+                            timg=Scp.mmc.getTaggedImage;
+                            img=timg.pix;
+                            command = 'Camera Recovered';
+                            Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command],'all',true);
+                        catch
+                            Scp.mmc.clearCircularBuffer()
+                            command = 'Servere Alert : Camera Did Not Recover. Placing Empty Image';
+                            Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command],'all',true);
+                            img = zeros(Scp.Width * Scp.Height,1);
+                        end
+                    end
                 else
                     Scp.mmc.snapImage;
                     img = Scp.mmc.getImage;

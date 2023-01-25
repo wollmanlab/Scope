@@ -29,15 +29,15 @@ classdef DHT11
             max_iter = 100;
             while not_completed & iter<max_iter
                     data = char(readline(Sensor.serial));
-                    if length(data)>0
-                    if data(1) == '+'
-                        if data(end) == '*'
-                            data = split(data(2:end-1),'%');
-                            Sensor.temp = data{2};
-                            Sensor.humidity = data{1};
-                            not_completed = false;
+                    if ~isempty(data)
+                        if data(1) == '+'
+                            if data(end) == '*'
+                                data = split(data(2:end-1),'%');
+                                Sensor.temp = data{2};
+                                Sensor.humidity = data{1};
+                                not_completed = false;
+                            end
                         end
-                    end
                     end
                     iter = iter+1;
             end

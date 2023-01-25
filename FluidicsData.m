@@ -10,8 +10,8 @@ classdef FluidicsData < handle
         Flow = true;
         Completed_Tasks = {}
         Single = false;
-        strip_wait_per_coverslip = 300; 
-        hybe_wait_per_coverslip = 500; % 350
+        strip_wait_per_coverslip = 250; 
+        hybe_wait_per_coverslip = 350; % 350
         initial_protocol = 'strip';
         initial_group = 'ABC';
         Tasks
@@ -32,6 +32,16 @@ classdef FluidicsData < handle
     methods
         function FlowData = FluidicsData()
             FlowData.update_FlowData();
+        end
+
+        function fill_wells_TBS(FlowData,Scp)
+            wells = [FlowData.FlowGroups{1:end}];
+            chambers = ['[',repmat(',', [1, (2*size(wells,2))-1]),']'];
+            chambers(2*(1:size(wells,2))) = wells(1:size(wells,2));
+            protocol = 'valve+3';
+            command = ['TBS_',chambers,'_',protocol];
+            Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command],'all',true);
+            system([FlowData.python,' ',FlowData.fluidics,'  ',command,' ',FlowData.extras,' &'])
         end
 
         function flow(FlowData,Scp)

@@ -19,6 +19,14 @@ classdef NucleiFocus < AutoFocus
         metric='Contrast_1D';
         ticker = 0;
         check_frequency = 0;
+
+        coarse_window = 200;
+        coarse_dZ = 20;
+        medium_window = 20;
+        medium_dZ = 2;
+        fine_window = 2;
+        fine_dZ = 1;
+
     end
     methods
         function AF = checkFocus(AF,Scp,varargin)
@@ -190,147 +198,66 @@ classdef NucleiFocus < AutoFocus
             end
         end
 
+        function Zfocus = ImageBasedCoarseGrainScan(AF,Scp)
+            Zfocus = ImageBasedScan(AF,Scp, AF.coarse_window, AF.coarse_dZ);
+        end
 
-%         function [Zfocus,contF] = ImageBasedFocusHillClimb(AF,Scp)
-%             %% Set channels and exposure
-%             Scp.Channel=AF.channel;
-%             Scp.Exposure=AF.exposure;
-%             Zs = [];
-%             Conts = [];
-%             if AF.verbose
-%                 figure(157),
-%                 set(157,'menubar','none','Name','Finding focus by contrast','NumberTitle','off')
-%                 clf
-%             end
-%             Zinit = Scp.Z;
-%             current_Z = Zinit;
-%             max_Z = Zinit+AF.max_dZ;
-%             min_Z = Zinit-AF.max_dZ;
-%             dZ = AF.dZ;%25*(6.3)^2;
-%             sgn = 1;
-% 
-%             acc = dZ^(AF.acceleration);
-%             cont1=AF.calcMetric(Scp);
-%             Zs = [Zs current_Z];
-%             Conts = [Conts cont1];
-% 
-%             if AF.verbose
-%                 plot(Scp.Z,cont1,'o')
-%                 hold all
-%             end
-%             %determine direction of motion
-%             current_Z = current_Z+sgn*dZ;
-%             Scp.Z = current_Z;
-%             cont2=AF.calcMetric(Scp);
-% 
-%             Zs = [Zs current_Z];
-%             Conts = [Conts cont2];
-%             if AF.verbose
-%                 plot(current_Z,cont2,'o')
-%             end
-%             if cont2<cont1
-%                 sgn = -sgn;
-%                 current_Z = current_Z+2*sgn*dZ;
-%                 Scp.Z  = current_Z;
-%                 cont2=AF.calcMetric(Scp);
-%                 if AF.verbose
-%                     set(157,'menubar','none','Name','Finding focus by contrast','NumberTitle','off')
-%                 end
-%                 Zs = [Zs current_Z];
-%                 Conts = [Conts cont2];
-%                 if AF.verbose
-%                     plot(current_Z,cont2,'o');
-%                 end
-% 
-%                 if cont2<cont1
-%                     dZ=dZ/2;%(acc^2);
-% 
-%                     current_Z = Zinit;
-%                     Scp.Z = current_Z;%start over with smaller region
-%                     cont1=AF.calcMetric(Scp);
-%                     current_Z = current_Z+sgn*dZ;
-%                     Scp.Z = current_Z;%Scp.Z+sgn*dZ;
-%                     cont2=AF.calcMetric(Scp);
-% 
-%                     Zs = [Zs current_Z];
-%                     Conts = [Conts cont2];
-%                     if AF.verbose
-%                         plot(current_Z,cont2,'o')
-%                     end
-%                     if cont2<cont1
-%                         sgn = -sgn;
-%                         current_Z = current_Z+2*sgn*dZ;
-%                         Scp.Z = current_Z;%Scp.Z+2*sgn*dZ;
-%                         cont2=AF.calcMetric(Scp);
-%                         Zs = [Zs current_Z];
-%                         Conts = [Conts cont2];
-%                         if AF.verbose
-%                             plot(current_Z,cont2,'o');
-%                             drawnow;
-%                         end
-%                     end
-%                 end
-%             end
-% 
-%             while dZ>=AF.resolution
-%                 while cont2>=cont1
-%                     cont1=cont2;
-%                     new_z = current_Z+sgn*dZ;
-%                     if (new_z>max_Z)
-%                         disp('Too High')
-%                         disp(dZ)
-%                         disp(new_z)
-%                         disp(max_Z)
-%                         disp(Zinit)
-%                         % Moved To Far go back the other direction
-%                         current_Z = Zinit;
-%                         %Scp.Z = Zinit;
-%                         sgn = -1;
-%                     elseif (new_z<min_Z)
-%                         disp('Too Low')
-%                         disp(dZ)
-%                         disp(new_z)
-%                         disp(max_Z)
-%                         disp(Zinit)
-%                         % Moved To Far go back the other direction
-%                         current_Z = Zinit;
-%                         %Scp.Z = Zinit;
-%                         sgn = 1;
-%                     else
-%                         current_Z = new_z;
-%                         %Scp.Z = new_z;
-%                     end
-%                     Scp.Z = current_Z;
-%                     cont2=AF.calcMetric(Scp);
-%                     if AF.verbose
-%                         figure(157);
-%                     end
-%                     Zs = [Zs current_Z];
-%                     Conts = [Conts cont2];
-%                     if AF.verbose
-%                         plot(current_Z,cont2,'o')
-%                         drawnow;
-%                     end
-% 
-%                 end
-%                 dZ = dZ/2;%acc;
-%                 sgn=-sgn;
-%                 cont1=cont2;
-%             end
-%             % Remove Outliers
-%             [z,i] = sort(Zs);
-%             C = Conts(i);
-%             c = medfilt1(Conts(i),5);
-%             o = ~isoutlier(abs(c-C));
-%             z = z(o);
-%             c = c(o);
-%             C = C(o);
-%             i = i(o);
-%             Zfocus = mean(z(C==max(C)));
-%             %Zfocus = mean(Zs(Conts==max(Conts)));
-%             Scp.Z = Zfocus;
-%             contF=AF.calcMetric(Scp);
-%         end
+        function Zfocus = ImageBasedMediumGrainScan(AF,Scp)
+            Zfocus = ImageBasedScan(AF,Scp, AF.medium_window, AF.medium_dZ);
+        end
+
+        function Zfocus = ImageBasedFineGrainScan(AF,Scp)
+            Zfocus = ImageBasedScan(AF,Scp, AF.fine_window, AF.fine_dZ);
+        end
+
+        function Zfocus = PrimaryImageBasedScan(AF,Scp)
+            tic
+            Zfocus = AF.ImageBasedCoarseGrainScan(Scp);
+            img = Scp.snapImage;
+            Zfocus = AF.ImageBasedMediumGrainScan(Scp);
+            img = Scp.snapImage;
+            Zfocus = AF.ImageBasedFineGrainScan(Scp);
+            img = Scp.snapImage;
+            toc
+        end
+
+        function Zfocus = SecondaryImageBasedScan(AF,Scp)
+            tic
+            Zfocus = AF.ImageBasedMediumGrainScan(Scp);
+            img = Scp.snapImage;
+            Zfocus = AF.ImageBasedFineGrainScan(Scp);
+            img = Scp.snapImage;
+            toc
+        end
+
+
+        function Zfocus = ImageBasedScan(AF,Scp,window,dZ)
+            zinit = Scp.Z;
+            zmax = zinit + window;
+            zmin = zinit - window;
+            steps = linspace(zmin,zmax,round((zmax-zmin)/dZ));
+            score = zeros(length(steps),1);
+
+%             % Turn on Light
+%             Scp.mmc.stopSequenceAcquisition()
+%             Scp.mmc.startContinuousSequenceAcquisition(0)
+%             Scp.ContinousImaging = true;
+Scp.Channel = AF.channel;
+Scp.Exposure = AF.exposure;
+            % Calculate Focus Score
+            for zindex = 1:length(steps)
+                z = steps(zindex);
+                Scp.Z = z; 
+                score(zindex) = AF.calcMetric(Scp);
+            end
+%             % Turn off Light
+%             Scp.mmc.stopSequenceAcquisition()
+%             Scp.ContinousImaging = false;
+%             scatter(steps,score)
+            % Determine Best Z
+            Zfocus = mean(steps(score==max(score)));
+            Scp.Z = Zfocus;
+        end
 
         function metric = calcMetric(AF,Scp)
             % snap an image

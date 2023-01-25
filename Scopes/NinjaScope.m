@@ -4,7 +4,7 @@ classdef NinjaScope < Scope
        OptovarStatus=[];
        Notifications = Notifications;
        AF = PerfectFocus;
-       Sensor = DHT11('COM9');
+       TempHumiditySensor = DHT11('COM9');
     end
     
     methods
@@ -27,13 +27,13 @@ classdef NinjaScope < Scope
             Scp.DeviceNames.LightPath = {'TILightPath','Label','Left100', 'Right100'};
             Scp.ScopeName = 'Ninja';
             Scp.mmc.setChannelGroup('Channel');
-            Scp.CameraName = 'FLIR';
+            Scp.CameraName = 'Camera';
             Scp.TriggerDeviceName='LEDarray-Switch';
             Scp.CameraAngle = 3.2857;
             %end
             
-            Scp.mmc.setProperty('Camera','Gain-AutoOrManual','Manual');
-            Scp.mmc.setProperty('Camera','Gain(dB)','4');
+            Scp.mmc.setProperty(Scp.CameraName,'Gain-AutoOrManual','Manual');
+            Scp.mmc.setProperty(Scp.CameraName,'Gain(dB)','4');
             Scp.Chamber = Plate('Costar96 (3904)');
             Scp.Chamber.x0y0 = [ 49776      -31364];
             Scp.Chamber.directionXY = [-1 1];

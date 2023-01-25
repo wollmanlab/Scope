@@ -1,6 +1,7 @@
 classdef ContrastPlaneFocus < NucleiFocus
     properties
-
+        groups
+        group_focuses
     end
     methods
         function AF = checkFocus(AF,Scp,varargin)
@@ -22,74 +23,162 @@ classdef ContrastPlaneFocus < NucleiFocus
         function AF = setupPositions(AF,Scp)
             uiwait(msgbox(['Create Atleast 4 Positions per sample']))
             AF.Pos = Scp.createPositionFromMM;
+            % Update Groups to be sections
+            for i = 1:length(AF.Pos.Labels)
+                if AF.Pos.Hidden(i)==0
+                    g = split(AF.Pos.Labels{i},'-');
+                    AF.Pos.Group{i} = g{2};
+                end
+            end
+            AF.groups = unique(AF.Pos.Group(AF.Pos.Hidden==0));
+            AF.group_focuses = zeros(length(AF.groups),1);
         end
 
         function AF = calculateZ(AF,Scp)
-            XYZ = zeros(size(AF.Pos.List,1),3);
-            XYZ(:,1:2) = AF.Pos.List(:,1:2);
-            last_XY = Scp.XY;
-            good_labels = 1:size(AF.Pos.Labels,1);
-            good_labels = good_labels(AF.Pos.Hidden==0);
-            for g=1:size(good_labels,2)
-                p=good_labels(g);
-                tic
-%                 if AF.Pos.Hidden(p)==1
-%                     continue
+            % Update Groups to be sections
+            for i = 1:length(AF.Pos.Labels)
+                if AF.Pos.Hidden(i)==0
+                    g = split(AF.Pos.Labels{i},'-');
+                    AF.Pos.Group{i} = g{2};
+                end
+            end
+            AF.groups = unique(AF.Pos.Group(AF.Pos.Hidden==0));
+            AF.group_focuses = zeros(length(AF.groups),1);
+            global_XYZ = zeros(length(AF.Pos.List),3);
+            global_XYZ(:,1:2) = AF.Pos.List(:,1:2);
+            % For each group
+            for G = 1:length(AF.groups)
+                disp(['Group ',int2str(G),' of ',int2str(length(AF.groups))])
+                m1 = ismember(AF.Pos.Group,AF.groups{G});
+                m2 = AF.Pos.Hidden==0;
+                m = m1&m2;
+                if sum(m)==0
+                    continue
+                end
+                good_labels = 1:length(AF.Pos.Labels);
+                good_labels = good_labels(m);
+                XYZ = zeros(sum(m),3);
+                XYZ(:,1:2) = AF.Pos.List(m,1:2);
+                % Go To Center of section
+                Scp.XY = mean(XYZ(:,1:2));
+                % Use Slow Wide Scan For primary search
+                section_focus = AF.PrimaryImageBasedScan(Scp);
+                AF.group_focuses(G) = section_focus;
+                global_XYZ(m,3) = section_focus;
+%                 % For each position in the group
+%                 for g = 1:length(good_labels)
+%                     tic
+%                     p = good_labels(g);
+%                     disp(['Position ',int2str(g),' of ',int2str(length(good_labels))])
+%                     Scp.XY = AF.Pos.List(p,1:2);
+%                     Scp.Z = section_focus; % always start at group focus
+%                     % Use Medium Speed Scan
+%                     position_focus = AF.ImageBasedFineGrainScan(Scp);
+%                     XYZ(p,3) = position_focus; 
+%                     % Maybe snap an image to save and use later %%%%%FUTURE
+%                     toc
 %                 end
-                disp([int2str(g),' of ',int2str(size(good_labels,2))])
-%                 dist = sqrt(sum((Scp.XY-last_XY).^2));
-%                 Scp.goto(AF.Pos.Labels{p}, AF.Pos)
-                Scp.XY = AF.Pos.List(p,1:2);
-% % % %                 if g==1
-% % % %                     % finer precise scan for first position of well
-% % % %                     focus = AF.ImageBasedFineScan(Scp);
-% % % %                 end
-
-%                 if (p==1)|(dist>AF.distance_thresh)
-%                     uiwait(msgbox(['Manually Find Focus First']))
-%                 end
-%                 last_XY = Scp.XY;
-%                 Scp.Z = AF.Pos.List(p,3);
-%                 pause(1)
-                focus = AF.ImageBasedFocusHillClimb(Scp);
-                XYZ(p,3) = focus;
-                toc
+%                 global_XYZ(m,3) = XYZ(:,3);
             end
             if strcmp(AF.Pos.axis{1},'XY')
                 AF.Pos.axis = {'X','Y','Z'};
             end
-            AF.Pos.List = XYZ;
-            AF = AF.updateB();
+            AF.Pos.List = global_XYZ;
         end
 
         function AF = updateZ(AF,Scp)
-            tic
-            % Go to 10% of positions and update Z 
-            good_labels = 1:size(AF.Pos.Labels,1);
-            good_labels = good_labels(AF.Pos.Hidden==0);
-            n_sites = max([10,round(size(good_labels,1)/4)]);
-            sites = randsample(good_labels,n_sites)';
-
-            XYZ = zeros(size(sites,1),3);
-            XYZ(:,1:2) = AF.Pos.List(sites,1:2);
-            for p=1:size(sites,1)
-                disp([int2str(p),' of ',int2str(size(sites,1))])
-                Scp.XY = AF.Pos.List(sites(p),1:2);
-                pause(1)
-                Scp.Z = AF.Pos.List(sites(p),3); 
-                focus = AF.ImageBasedFocusHillClimb(Scp);
-%                 focus = AF.ImageBasedFocusHillClimb(Scp);
-                XYZ(p,3) = focus;
+            global_XYZ = zeros(length(AF.Pos.List),3);
+            global_XYZ(:,1:3) = AF.Pos.List(:,1:3);
+            % For each section
+            for g = 1:length(AF.groups)
+                disp(['Group ',int2str(g),' of ',int2str(length(AF.groups))])
+                m1 = ismember(AF.Pos.Group,AF.groups{g});
+                m2 = AF.Pos.Hidden==0;
+                m = m1&m2;
+                good_labels = 1:length(AF.Pos.Labels);
+                good_labels = good_labels(m);
+                XYZ = zeros(sum(m),3);
+                XYZ(:,1:3) = AF.Pos.List(m,1:3);
+                % Go To Center of section
+                Scp.XY = mean(XYZ(:,1:2));
+                Scp.Z =  AF.group_focuses(g); % Use last Focus as a starting place
+                % Use Medium Speed Scan
+                section_focus = AF.SecondaryImageBasedScan(Scp);
+                AF.group_focuses(g) = section_focus;
+%                 prevous_section_focus = AF.group_focuses(g);
+%                 translation = prevous_section_focus-section_focus;
+                global_XYZ(m,3) = section_focus;% XYZ(:,3)-translation;
             end
-            translation = median(AF.Pos.List(sites,3)-XYZ(:,3));
-            AF.Pos.List(:,3) = AF.Pos.List(:,3)-translation;
-            toc
+            if strcmp(AF.Pos.axis{1},'XY')
+                AF.Pos.axis = {'X','Y','Z'};
+            end
+            AF.Pos.List = global_XYZ;
         end
 
-        function AF = updateB(AF)
-            P = AF.Pos.List;
-            AF.B = [P(:,1), P(:,2), ones(size(P,1),1)] \ P(:,3);
-        end
+
+%         function AF = calculateZ(AF,Scp)
+%             XYZ = zeros(size(AF.Pos.List,1),3);
+%             XYZ(:,1:2) = AF.Pos.List(:,1:2);
+%             last_XY = Scp.XY;
+%             good_labels = 1:size(AF.Pos.Labels,1);
+%             good_labels = good_labels(AF.Pos.Hidden==0);
+%             for g=1:size(good_labels,2)
+%                 p=good_labels(g);
+%                 tic
+% 
+%                 disp([int2str(g),' of ',int2str(size(good_labels,2))])
+% 
+%                 Scp.XY = AF.Pos.List(p,1:2);
+% % % % %                 if g==1
+% % % % %                     % finer precise scan for first position of well
+% % % % %                     focus = AF.ImageBasedFineScan(Scp);
+% % % % %                 end
+% 
+% %                 if (p==1)|(dist>AF.distance_thresh)
+% %                     uiwait(msgbox(['Manually Find Focus First']))
+% %                 end
+% %                 last_XY = Scp.XY;
+% %                 Scp.Z = AF.Pos.List(p,3);
+% %                 pause(1)
+%                 focus = AF.ImageBasedFocusHillClimb(Scp);
+%                 XYZ(p,3) = focus;
+%                 toc
+%             end
+%             if strcmp(AF.Pos.axis{1},'XY')
+%                 AF.Pos.axis = {'X','Y','Z'};
+%             end
+%             AF.Pos.List = XYZ;
+%             AF = AF.updateB();
+%         end
+
+%         function AF = updateZ(AF,Scp)
+%             tic
+%             % Go to 10% of positions and update Z 
+%             good_labels = 1:size(AF.Pos.Labels,1);
+%             good_labels = good_labels(AF.Pos.Hidden==0);
+%             n_sites = max([10,round(size(good_labels,1)/4)]);
+%             sites = randsample(good_labels,n_sites)';
+% 
+%             XYZ = zeros(size(sites,1),3);
+%             XYZ(:,1:2) = AF.Pos.List(sites,1:2);
+%             for p=1:size(sites,1)
+%                 disp([int2str(p),' of ',int2str(size(sites,1))])
+%                 Scp.XY = AF.Pos.List(sites(p),1:2);
+%                 pause(1)
+%                 Scp.Z = AF.Pos.List(sites(p),3); 
+%                 focus = AF.ImageBasedFocusHillClimb(Scp);
+% %                 focus = AF.ImageBasedFocusHillClimb(Scp);
+%                 XYZ(p,3) = focus;
+%             end
+%             translation = median(AF.Pos.List(sites,3)-XYZ(:,3));
+%             AF.Pos.List(:,3) = AF.Pos.List(:,3)-translation;
+%             toc
+%         end
+
+%         function AF = updateB(AF)
+%             P = AF.Pos.List;
+%             AF.B = [P(:,1), P(:,2), ones(size(P,1),1)] \ P(:,3);
+%         end
 
 %         function metric = calcMetric(AF,Scp)
 %             if strcmp(AF.metric,'Contrast')
@@ -132,26 +221,26 @@ classdef ContrastPlaneFocus < NucleiFocus
 %             end
 %         end
         
-        function Zfocus = iterativeFindFocus(AF,Scp)
-            contF = 0;
-            AF.iteration = 0;
-            Zinit = Scp.Z;
-            backup_dZ = AF.dZ;
-            while (contF<AF.thresh)&(AF.iteration<AF.max_iterations)
-                Scp.Z = Zinit;
-                AF.iteration = AF.iteration+1;
-                disp(['Iteration',int2str(AF.iteration)])
-                [Zfocus,contF] = AF.ImageBasedFocusHillClimb(Scp);
-                AF.dZ = 2*AF.dZ; % Try Larger Window
-            end
-            AF.dZ = backup_dZ;
-            if AF.iteration>=AF.max_iterations
-                disp('No Focus Found')
-                % Focus Wasnt Found
-                Zfocus = Zinit;
-                Scp.Z = Zinit;
-            end
-        end
+%         function Zfocus = iterativeFindFocus(AF,Scp)
+%             contF = 0;
+%             AF.iteration = 0;
+%             Zinit = Scp.Z;
+%             backup_dZ = AF.dZ;
+%             while (contF<AF.thresh)&(AF.iteration<AF.max_iterations)
+%                 Scp.Z = Zinit;
+%                 AF.iteration = AF.iteration+1;
+%                 disp(['Iteration',int2str(AF.iteration)])
+%                 [Zfocus,contF] = AF.ImageBasedFocusHillClimb(Scp);
+%                 AF.dZ = 2*AF.dZ; % Try Larger Window
+%             end
+%             AF.dZ = backup_dZ;
+%             if AF.iteration>=AF.max_iterations
+%                 disp('No Focus Found')
+%                 % Focus Wasnt Found
+%                 Zfocus = Zinit;
+%                 Scp.Z = Zinit;
+%             end
+%         end
 
 %         function [Zfocus,contF] = ImageBasedFocusHillClimb(AF,Scp)
 %             %% Set channels and exposure
@@ -285,46 +374,46 @@ classdef ContrastPlaneFocus < NucleiFocus
 %             Scp.Z = Zfocus;
 %             contF=AF.calcMetric(Scp);
 %         end
-
-        function Zfocus = localFocusImageScan(AF,Scp)
-            start_z = Scp.Z;
-            % Choose Direction First
-            cont=AF.calcMetric(Scp);
-            Scp.Z = start_z+AF.dZ;
-            cont1=AF.calcMetric(Scp);
-            Scp.Z = start_z-AF.dZ;
-            cont2=AF.calcMetric(Scp);
-            not_finished = true;
-            if cont1>cont
-                % UP
-                direction = 1;
-                cont = cont1;
-                Scp.Z = start_z+AF.dZ;
-            elseif cont2>cont
-                % Down
-                direction = -1;
-                cont = cont2;
-                Scp.Z = start_z-AF.dZ;
-            else
-                % Already There
-                Zfocus = start_z;
-                Scp.Z = Zfocus;
-                not_finished = false;
-            end
-            while not_finished
-                Scp.Z = Scp.Z+(direction*AF.dZ);
-                cont1=AF.calcMetric(Scp);
-                if cont>cont1
-                    % Finished
-                    not_finished = false;
-                    Zfocus = Scp.Z-(direction*AF.dZ);
-                    Scp.Z = Zfocus;
-                else
-                    % Not There Yet
-                    cont = cont1;
-                end
-            end
-
-        end
+% 
+%         function Zfocus = localFocusImageScan(AF,Scp)
+%             start_z = Scp.Z;
+%             % Choose Direction First
+%             cont=AF.calcMetric(Scp);
+%             Scp.Z = start_z+AF.dZ;
+%             cont1=AF.calcMetric(Scp);
+%             Scp.Z = start_z-AF.dZ;
+%             cont2=AF.calcMetric(Scp);
+%             not_finished = true;
+%             if cont1>cont
+%                 % UP
+%                 direction = 1;
+%                 cont = cont1;
+%                 Scp.Z = start_z+AF.dZ;
+%             elseif cont2>cont
+%                 % Down
+%                 direction = -1;
+%                 cont = cont2;
+%                 Scp.Z = start_z-AF.dZ;
+%             else
+%                 % Already There
+%                 Zfocus = start_z;
+%                 Scp.Z = Zfocus;
+%                 not_finished = false;
+%             end
+%             while not_finished
+%                 Scp.Z = Scp.Z+(direction*AF.dZ);
+%                 cont1=AF.calcMetric(Scp);
+%                 if cont>cont1
+%                     % Finished
+%                     not_finished = false;
+%                     Zfocus = Scp.Z-(direction*AF.dZ);
+%                     Scp.Z = Zfocus;
+%                 else
+%                     % Not There Yet
+%                     cont = cont1;
+%                 end
+%             end
+% 
+%         end
     end
 end
