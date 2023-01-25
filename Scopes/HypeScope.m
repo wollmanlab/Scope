@@ -12,6 +12,7 @@ classdef HypeScope < Scope
         AF = TheseusFocus;
         LargeMove = 500; % large movement, i.e. break the move into steps and autofocus in between 
         Notifications = Notifications;
+        Sensor = DHT11('COM17');
     end
     
     
@@ -38,7 +39,7 @@ classdef HypeScope < Scope
             Scp.CameraAngle = 2.75;
 
             %% Scope-startup - runs Nikon-Epi specific configurations
-            Scp.basePath = 'D:\HypeImages';
+            Scp.basePath = 'D:\Images';
             
             %% some propeties require knowing the name of the device
             Scp.DeviceNames.Objective = 'ZeissObjectiveTurret';
