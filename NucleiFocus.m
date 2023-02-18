@@ -8,7 +8,7 @@ classdef NucleiFocus < AutoFocus
         dZ = 50;
         max_dZ = 500;
         resolution=1;
-        n_neighbors = 10;
+        n_neighbors = 3;
         acceleration = 1/5;
         scale = 2;
         resize=1;
@@ -244,12 +244,20 @@ classdef NucleiFocus < AutoFocus
 %             Scp.ContinousImaging = true;
 Scp.Channel = AF.channel;
 Scp.Exposure = AF.exposure;
+% Set Auto Shutter Off
+Scp.mmc.setAutoShutter(0);
+% Open Shutter (Auto Shutter must be off)
+Scp.mmc.setShutterOpen(1);
             % Calculate Focus Score
             for zindex = 1:length(steps)
                 z = steps(zindex);
                 Scp.Z = z; 
                 score(zindex) = AF.calcMetric(Scp);
             end
+            % Set Auto Shutter On
+Scp.mmc.setAutoShutter(1);
+% Open Shutter (Auto Shutter must be off)
+Scp.mmc.setShutterOpen(0);
 %             % Turn off Light
 %             Scp.mmc.stopSequenceAcquisition()
 %             Scp.ContinousImaging = false;
@@ -257,6 +265,8 @@ Scp.Exposure = AF.exposure;
             % Determine Best Z
             Zfocus = mean(steps(score==max(score)));
             Scp.Z = Zfocus;
+
+
         end
 
         function metric = calcMetric(AF,Scp)

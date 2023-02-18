@@ -121,6 +121,7 @@ classdef (Abstract) Scope < handle
         shiftfilepath =[];
 
         MMversion = 2.0;
+        current_figure = 1;
 
     end
 
@@ -1557,10 +1558,12 @@ classdef (Abstract) Scope < handle
             XY_Limits = max(XY_coordinates)+arg.border;
             stitched = zeros(XY_Limits(x),XY_Limits(y));
 %             f = waitbar(0, 'Starting');
+% FF = mean(Images,3);
             for i=1:size(Images,3)
 %                 waitbar(i/size(Images,3), f, sprintf('Progress: %d %%', floor(i/size(Images,3)*100)));
                 img_coordinates = XY_coordinates(i,:);
                 img = Images(:,:,i);
+%                 img = img -imgaussfilt(img,50);
 %                 %%
 %                 img = img-mean(img(:));
 %                 img = img/std(img(:));
@@ -2039,9 +2042,19 @@ classdef (Abstract) Scope < handle
                             Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command],'all',true);
                         catch
                             Scp.mmc.clearCircularBuffer()
-                            command = 'Servere Alert : Camera Did Not Recover. Placing Empty Image';
+                            command = 'Servere Alert : Camera Did Not Recover. I Need Help!';
                             Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command],'all',true);
-                            img = zeros(Scp.Width * Scp.Height,1);
+                            y = 'y';
+                            n = 'n';
+                            c = input("continue? (y/n))");
+                            if c=='y'
+                                Scp.mmc.snapImage;
+                                timg=Scp.mmc.getTaggedImage;
+                                img=timg.pix;
+                            elseif c=='n'
+                                error = out;
+                            end
+%                             img = zeros(Scp.Width * Scp.Height,1);
                         end
                     end
                 else
@@ -2882,6 +2895,80 @@ classdef (Abstract) Scope < handle
             end
         end
 
+        function acq_name =  getLastAcqname(Scp,varargin)
+            arg.pth = Scp.pth;
+            arg = parseVarargin(varargin,arg);
+            listing = dir(arg.pth);
+            max_acq = 0;
+            for j=1:length(listing)
+                if contains(listing(j).name,['.'])
+                    do = 'nothing';
+                elseif contains(listing(j).name,['_'])
+                    acq_number = strsplit(listing(j).name,'_');
+                    acq_number = acq_number{end};
+                    acq_number = str2num(acq_number);
+                    if acq_number>max_acq
+                        max_acq = acq_number;
+                        acq_name = listing(j).name;
+                    end
+                end
+            end
+        end
 
+        function viewAcq(Scp,varargin)
+            arg.path = Scp.pth;
+            arg.channel = 'DeepBlue';
+            arg.acq_name = '';
+            arg.pixel_size = 0.490;
+            arg.acq_name = '';
+            arg.rotate = 90;
+            arg.flip = 0;
+            arg.border = 500;
+            arg.x = 1;
+            arg.y = 2;
+            arg.well = '';
+            arg.max_figures = 20;
+            arg = parseVarargin(varargin,arg);
+            if strcmp(arg.acq_name,'')
+                arg.acq_name = Scp.getLastAcqname('pth',arg.path);
+            end
+
+            md = Metadata([Scp.pth,'\',arg.acq_name]);
+            
+            [Images, idxes] = md.stkread('acq', arg.acq_name, 'flatfieldcorrection', false,'Channel',arg.channel);
+            XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
+            stitched = Scp.stitch(Images-median(Images,3),XY_Cell, ...
+                'pixel_size',arg.pixel_size, ...
+                'rotate',arg.rotate, ...
+                'flip',arg.flip, ...
+                'border',arg.border, ...
+                'x',arg.x, ...
+                'y',arg.y);
+            clear Images;
+            stitched(stitched<0) = 0;
+            stitched = uint16(stitched*2^16-1);
+            filename = [arg.acq_name,'_Well_',arg.well,'_',arg.channel,'.tif'];
+            imwrite(stitched,fullfile(Scp.pth,arg.acq_name,filename))
+            vmin = prctile(stitched(stitched>0),5);
+            vmax = prctile(stitched(stitched>0),95);
+            stitched = stitched(max(stitched')>0,:);
+            stitched = stitched(:,max(stitched)>0);
+            stitched(stitched<vmin) = vmin;
+            stitched(stitched>vmax) = vmax;
+            Scp.current_figure = Scp.current_figure+1;
+            if Scp.current_figure>arg.max_figures
+                Scp.current_figure = 1;
+            end
+            try
+                close(Scp.current_figure)
+            catch
+            end
+            figure(Scp.current_figure)
+            imshow(stitched,'DisplayRange',[vmin,vmax])
+            colormap jet
+            colorbar()
+            filename = [arg.acq_name,' Well ',arg.well,' ',arg.channel];
+            title(filename)
+        end
     end
 end

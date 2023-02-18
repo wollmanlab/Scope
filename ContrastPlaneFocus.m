@@ -2,6 +2,10 @@ classdef ContrastPlaneFocus < NucleiFocus
     properties
         groups
         group_focuses
+        radius = 1500/2;
+        method = 'median';
+        n_pos = 3;
+
     end
     methods
         function AF = checkFocus(AF,Scp,varargin)
@@ -13,8 +17,15 @@ classdef ContrastPlaneFocus < NucleiFocus
             if AF.n_neighbors == 1
                 Z = P(:,3);
             else
-                AF.B = [P(:,1), P(:,2), ones(size(P,1),1)] \ P(:,3);
-                Z = [x,y ones(size(1,1),1)]*AF.B;
+                if strcmp(AF.method,'plane')
+                    AF.B = [P(:,1), P(:,2), ones(size(P,1),1)] \ P(:,3);
+                    Z = [x,y ones(size(1,1),1)]*AF.B;
+                elseif  strcmp(AF.method,'median')
+                    Z = median(P(:,3));
+                else
+                    Z = mean(P(:,3));
+                end
+
             end
             Scp.Z = Z;
             AF.foundFocus = true;
@@ -34,7 +45,16 @@ classdef ContrastPlaneFocus < NucleiFocus
             AF.group_focuses = zeros(length(AF.groups),1);
         end
 
-        function AF = calculateZ(AF,Scp)
+        function AF = filterPositions(AF,percentage)
+            
+            
+        end
+
+        function AF = calculateZ(AF,Scp,varargin)
+
+            arg.filter = true;
+            arg.percentage = 0.75;
+            arg = parseVarargin(varargin,arg);
             % Update Groups to be sections
             for i = 1:length(AF.Pos.Labels)
                 if AF.Pos.Hidden(i)==0
@@ -55,8 +75,19 @@ classdef ContrastPlaneFocus < NucleiFocus
                 if sum(m)==0
                     continue
                 end
+
                 good_labels = 1:length(AF.Pos.Labels);
                 good_labels = good_labels(m);
+
+                if arg.filter
+                    filtered_labels = datasample(good_labels,floor(length(good_labels)*arg.percentage),'Replace',false);
+                    AF.Pos.Hidden(filtered_labels) = 1;
+                    m1 = ismember(AF.Pos.Group,AF.groups{G});
+                    m2 = AF.Pos.Hidden==0;
+                    m = m1&m2;
+                    good_labels = 1:length(AF.Pos.Labels);
+                    good_labels = good_labels(m);
+                end
                 XYZ = zeros(sum(m),3);
                 XYZ(:,1:2) = AF.Pos.List(m,1:2);
                 % Go To Center of section
@@ -65,20 +96,60 @@ classdef ContrastPlaneFocus < NucleiFocus
                 section_focus = AF.PrimaryImageBasedScan(Scp);
                 AF.group_focuses(G) = section_focus;
                 global_XYZ(m,3) = section_focus;
-%                 % For each position in the group
-%                 for g = 1:length(good_labels)
-%                     tic
-%                     p = good_labels(g);
-%                     disp(['Position ',int2str(g),' of ',int2str(length(good_labels))])
-%                     Scp.XY = AF.Pos.List(p,1:2);
-%                     Scp.Z = section_focus; % always start at group focus
-%                     % Use Medium Speed Scan
-%                     position_focus = AF.ImageBasedFineGrainScan(Scp);
-%                     XYZ(p,3) = position_focus; 
-%                     % Maybe snap an image to save and use later %%%%%FUTURE
-%                     toc
+                % Create 3x3 grid of positions for reference
+%                 ys = [-2,-1,0,1,2];
+%                 xs=[-2,-1,0,1,2];
+%                 temp_focuses = zeros(length(ys)*length(xs),3);
+%                 ticker = 1;
+%                 for y = ys
+%                     Y = mean(XYZ(:,2))+(y*AF.radius);
+%                     for x = xs
+%                         X = mean(XYZ(:,1))+(x*AF.radius);
+%                         Scp.XY = [X,Y];
+%                         Scp.Z = section_focus;
+%                         Z = AF.SecondaryImageBasedScan(Scp);
+%                         temp_focuses(ticker,:) = [X,Y,Z];
+%                         ticker = ticker+1;
+%                     end
 %                 end
+                % For each position in the group
+                for g = 1:length(good_labels)
+%                     tic
+                    p = good_labels(g);
+                    disp(['Position ',int2str(g),' of ',int2str(length(good_labels))])
+                    Scp.XY = AF.Pos.List(p,1:2);
+                    Scp.Z = section_focus; % always start at group focus
+                    % Use Medium Speed Scan
+                    position_focus = AF.SecondaryImageBasedScan(Scp);
+                    global_XYZ(p,3) = position_focus; 
+                    % Maybe snap an image to save and use later %%%%%FUTURE
+%                     toc
+                end
 %                 global_XYZ(m,3) = XYZ(:,3);
+
+% P = temp_focuses;
+% % add outlier detection
+% P = P(P(:,3)<max(P(:,3)),:);
+% P = P(P(:,3)>min(P(:,3)),:);
+% AF.B = [P(:,1), P(:,2), ones(size(P,1),1)] \ P(:,3);
+% guess_focuses = zeros(size(temp_focuses));
+% for i=1:size(temp_focuses,1)
+%     guess_focuses(i,1:2) = temp_focuses(i,1:2);
+%     guess_focuses(i,3) = [temp_focuses(i,1),temp_focuses(i,2) ones(size(1,1),1)]*AF.B;
+% end
+% 
+% figure(102)
+% hold on
+% scatter(temp_focuses(:,1)+500,temp_focuses(:,2)+500,100,temp_focuses(:,3),'filled')
+% scatter(guess_focuses(:,1),guess_focuses(:,2),100,guess_focuses(:,3),'filled')
+% hold off
+% colorbar
+% A = temp_focuses - guess_focuses;
+% figure(104)
+% hold on
+% scatter(temp_focuses(:,1),temp_focuses(:,2),100,A(:,3),'filled')
+% hold off
+% colorbar
             end
             if strcmp(AF.Pos.axis{1},'XY')
                 AF.Pos.axis = {'X','Y','Z'};
@@ -95,19 +166,37 @@ classdef ContrastPlaneFocus < NucleiFocus
                 m1 = ismember(AF.Pos.Group,AF.groups{g});
                 m2 = AF.Pos.Hidden==0;
                 m = m1&m2;
+                if sum(m)==0
+                    continue
+                end
                 good_labels = 1:length(AF.Pos.Labels);
                 good_labels = good_labels(m);
-                XYZ = zeros(sum(m),3);
-                XYZ(:,1:3) = AF.Pos.List(m,1:3);
-                % Go To Center of section
-                Scp.XY = mean(XYZ(:,1:2));
-                Scp.Z =  AF.group_focuses(g); % Use last Focus as a starting place
-                % Use Medium Speed Scan
-                section_focus = AF.SecondaryImageBasedScan(Scp);
-                AF.group_focuses(g) = section_focus;
+                if sum(m)>AF.n_pos
+                    n_pos = AF.n_pos;
+                else
+                    n_pos = sum(m);
+                end
+                selected_labels = datasample(good_labels,n_pos,'Replace',false);
+                XYZ = zeros(n_pos,3);
+                XYZ(:,1:3) = AF.Pos.List(selected_labels,1:3);
+                
+%                 % Go To Center of section
+%                 Scp.XY = mean(XYZ(:,1:2));
+%                 Scp.Z =  AF.group_focuses(g); % Use last Focus as a starting place
+%                 % Use Medium Speed Scan
+%                 section_focus = AF.SecondaryImageBasedScan(Scp);
+%                 AF.group_focuses(g) = section_focus;
+
+                for i=1:n_pos
+                    Scp.XY = XYZ(i,1:2);
+                    Scp.Z = XYZ(i,3);
+                    XYZ(i,3) = AF.SecondaryImageBasedScan(Scp);
+                end
+                translation = median(global_XYZ(selected_labels,3)-XYZ(:,3));
+                global_XYZ(m,3) = global_XYZ(m,3)-translation;
 %                 prevous_section_focus = AF.group_focuses(g);
 %                 translation = prevous_section_focus-section_focus;
-                global_XYZ(m,3) = section_focus;% XYZ(:,3)-translation;
+%                 global_XYZ(m,3) = section_focus;% XYZ(:,3)-translation;
             end
             if strcmp(AF.Pos.axis{1},'XY')
                 AF.Pos.axis = {'X','Y','Z'};

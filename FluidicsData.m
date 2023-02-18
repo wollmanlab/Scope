@@ -10,8 +10,8 @@ classdef FluidicsData < handle
         Flow = true;
         Completed_Tasks = {}
         Single = false;
-        strip_wait_per_coverslip = 250; 
-        hybe_wait_per_coverslip = 350; % 350
+        strip_wait_per_coverslip = 230; 
+        hybe_wait_per_coverslip = 340; % 350
         initial_protocol = 'strip';
         initial_group = 'ABC';
         Tasks
@@ -64,11 +64,11 @@ classdef FluidicsData < handle
             protocol = FlowData.Tasks{FlowData.current_idx,2};
             command = ['Hybe',hybe,'_',chambers,'_',protocol];
             if strcmp(protocol,'strip')
-                FlowData.wait_time = FlowData.strip_wait_per_coverslip*size(wells,2) + 600;
+                FlowData.wait_time = FlowData.strip_wait_per_coverslip*size(wells,2) + 600+30;
             elseif strcmp(protocol,'hybe')
-                FlowData.wait_time = FlowData.hybe_wait_per_coverslip*size(wells,2) + 600;
+                FlowData.wait_time = FlowData.hybe_wait_per_coverslip*size(wells,2) + 600+30;
             else
-                FlowData.wait_time = FlowData.hybe_wait_per_coverslip*size(wells,2) + 600;
+                FlowData.wait_time = FlowData.hybe_wait_per_coverslip*size(wells,2) + 600+30;
             end
             FlowData.start = clock;
             Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command],'all',true);
