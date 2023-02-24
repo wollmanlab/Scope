@@ -59,6 +59,8 @@ classdef TheseusFocus < AutoFocus
         end
         
         function current_plot = acquireFocus(AF,Scp)
+            previous_channel = Scp.Channel;
+            previous_exposure = Scp.Exposure;
             Scp.Channel = AF.Channel;
             Scp.Exposure = AF.Exposure;
             img = Scp.snapImage();
@@ -67,6 +69,9 @@ classdef TheseusFocus < AutoFocus
             current_plot = mean(bands,2);
             current_plot = imgaussfilt(current_plot,5);
             current_plot = current_plot/max(current_plot);
+            
+            Scp.Channel = previous_channel;
+            Scp.Exposure = previous_exposure;
         end
         
         function AF = generateReferenceFocus(AF,Scp)

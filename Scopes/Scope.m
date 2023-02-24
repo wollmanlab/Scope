@@ -218,7 +218,6 @@ classdef (Abstract) Scope < handle
         function acqFrame(Scp,AcqData,acqname,varargin)
             % acqFrame - acquire a single frame in currnet position / timepoint
             % here is also where we add / save the metadata
-
             % set up default position based on Scope's Tpnts and Pos
             if ~isempty(Scp.Tpnts)
                 arg.t = Scp.Tpnts.current;
@@ -256,11 +255,12 @@ classdef (Abstract) Scope < handle
             end
 
             % set baseZ to allow dZ between channels
-            if ~isempty(cat(1,AcqData.dZ))
-                baseZ=Scp.Z;
-            else 
-                baseZ = nan; 
-            end
+            baseZ=Scp.Z;
+%             if ~isempty(cat(1,AcqData.dZ))
+%                 baseZ=Scp.Z;
+%             else 
+%                 baseZ = nan; 
+%             end
             % get XY to save in metadata from position list
 %             XY = Scp.XY; %#ok<PROPLC>
             XY = round(Scp.Pos.List(Scp.Pos.current,:));%#ok<PROPLC>
@@ -286,7 +286,8 @@ classdef (Abstract) Scope < handle
 
             % look over all channel
             for i=1:n
-
+%                 Scp.Channel = AcqData(n).Channel;
+%                 Scp.Exposure = AcqData(n).Exposure;
                 % Never skip on the first frame...
                 if  isempty(arg.refposname) && Scp.FrameCount(p) >1 && mod(Scp.FrameCount(p),AcqData(i).Skip)
                     skipped(i)=true;
@@ -294,7 +295,7 @@ classdef (Abstract) Scope < handle
                 end
 
                 %% update Scope state
-                if ~TriggeredChannels(i) && length(AcqData)>1
+                if ~TriggeredChannels(i)%% && length(AcqData)>1
                     Scp.updateState(AcqData(i)); % set scope using all fields of AcqData including channel, dZ, exposure etc.
                 end
                 Scp.TimeStamp='updateState';
@@ -426,7 +427,13 @@ classdef (Abstract) Scope < handle
                 end
 
                 [~,xy_before_transform] = Scp.Pos.getPositionFromLabel(Scp.Pos.peek);
-                ix(i) = Scp.MD.addNewImage(filename,'Scope',class(Scp),'FlatField',Scp.CurrentFlatFieldConfig,'Position',pos,'group',grp,'acq',acqname,'frame',t,'TimestampImage',T(i),'XY',XY,'PixelSize',Scp.PixelSize,'PlateType',Scp.Chamber.type,'Z',Zformd,'Zindex',arg.z,'XYbeforeTransform',xy_before_transform,'Temperature',temperature,'Humidity',humidity); %#ok<PROPLC>
+                ix(i) = Scp.MD.addNewImage(filename,'Scope',class(Scp), ... 
+                'FlatField',Scp.CurrentFlatFieldConfig, ... 
+                'Position',pos,'group',grp,'acq',acqname, ... 
+                'frame',t,'TimestampImage',T(i),'XY',XY, ... 
+                'PixelSize',Scp.PixelSize,'PlateType',Scp.Chamber.type, ... 
+                'Z',Zformd,'Zindex',arg.z,'XYbeforeTransform', ... 
+                xy_before_transform,'Temperature',temperature,'Humidity',humidity); %#ok<PROPLC>
 %                 ix(i) = Scp.MD.addNewImage(filename,'Scope',class(Scp),'FlatField',Scp.CurrentFlatFieldConfig,'Position',pos,'group',grp,'acq',acqname,'frame',t,'TimestampImage',T(i),'XY',XY,'PixelSize',Scp.PixelSize,'PlateType',Scp.Chamber.type,'Z',Zformd,'Zindex',arg.z,'XYbeforeTransform',xy_before_transform); %#ok<PROPLC>
                 fld = fieldnames(AcqData(i));
                 for j=1:numel(fld)
@@ -1154,7 +1161,9 @@ classdef (Abstract) Scope < handle
             end
 
             %% exposure
-            Scp.Exposure=AcqData.Exposure;
+            if ~(Scp.Exposure == AcqData.Exposure)
+                Scp.Exposure=AcqData.Exposure;
+            end
 
             %% dZ option between channels
             if ~isempty(AcqData.dZ) && AcqData.dZ~=0
@@ -1241,7 +1250,7 @@ classdef (Abstract) Scope < handle
 
             switch arg.postype
                 case 'standard'
-                    Pos = Positions(PL,'axis',arg.axis);
+                    Pos = Scp.Pos.La(PL,'axis',arg.axis);
                 case 'relative'
                     Pos = RelativePositions(PL,'axis',arg.axis);
                 case 'beads'
@@ -1554,7 +1563,7 @@ classdef (Abstract) Scope < handle
             arg = parseVarargin(varargin,arg);
             x = arg.x;
             y = arg.y;
-            XY_coordinates = round((cell2mat(XY_Cell)-min(cell2mat(XY_Cell)))/10)+1;
+            XY_coordinates = round((cell2mat(XY_Cell)-min(cell2mat(XY_Cell)))/arg.stitched_pixel_size)+1;
             XY_Limits = max(XY_coordinates)+arg.border;
             stitched = zeros(XY_Limits(x),XY_Limits(y));
 %             f = waitbar(0, 'Starting');
@@ -1577,9 +1586,9 @@ classdef (Abstract) Scope < handle
                 end
                 % Resize Image
                 shape = round(size(img)*arg.pixel_size/arg.stitched_pixel_size)-1;
-                img = imresize(img,shape+1);
-
-                %populate
+                img = imresize(img,shape+1,'bicubic');
+%                 img = imresize(img,shape+1,'nearest');
+                %populatenearest
                 x_lower_bound = img_coordinates(x);
                 x_upper_bound = x_lower_bound+shape(x);
                 y_lower_bound = img_coordinates(y);
@@ -2400,7 +2409,7 @@ classdef (Abstract) Scope < handle
         end
 
         function setZ(Scp,Z)
-%             currZ = Scp.Z;
+            currZ = Scp.Z;
 %             dist = sqrt(sum((currZ-Z).^2));
 %             if Scp.Zpercision >0 && dist < Scp.Zpercision
 %                 fprintf('movment too small - skipping Z movement\n');
@@ -2410,7 +2419,7 @@ classdef (Abstract) Scope < handle
             try
                 for attempt=1:max_attempts
                     if attempt>1
-                        pause(attempt*5)
+                        pause(attempt)
                         Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z-2)
                         if attempt>2
                             message = ['Stage is not able to get to this position (Z) Attempt #',int2str(attempt)];
@@ -2418,6 +2427,9 @@ classdef (Abstract) Scope < handle
                         end
                     end
                     Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
+                    if attempt==1
+                        pause(0.2+abs(Z-currZ)/100)
+                    end
                     if Scp.checkZStage(Z)
                         break
                     end
@@ -2928,6 +2940,8 @@ classdef (Abstract) Scope < handle
             arg.y = 2;
             arg.well = '';
             arg.max_figures = 20;
+            arg.stitched_pixel_size = 10;
+            arg.zindex = 1;
             arg = parseVarargin(varargin,arg);
             if strcmp(arg.acq_name,'')
                 arg.acq_name = Scp.getLastAcqname('pth',arg.path);
@@ -2935,7 +2949,7 @@ classdef (Abstract) Scope < handle
 
             md = Metadata([Scp.pth,'\',arg.acq_name]);
             
-            [Images, idxes] = md.stkread('acq', arg.acq_name, 'flatfieldcorrection', false,'Channel',arg.channel);
+            [Images, idxes] = md.stkread('acq', arg.acq_name, 'flatfieldcorrection', false,'Channel',arg.channel,'Zindex',arg.zindex);
             XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
             stitched = Scp.stitch(Images-median(Images,3),XY_Cell, ...
                 'pixel_size',arg.pixel_size, ...
@@ -2943,7 +2957,8 @@ classdef (Abstract) Scope < handle
                 'flip',arg.flip, ...
                 'border',arg.border, ...
                 'x',arg.x, ...
-                'y',arg.y);
+                'y',arg.y, ...
+                'stitched_pixel_size',arg.stitched_pixel_size);
             clear Images;
             stitched(stitched<0) = 0;
             stitched = uint16(stitched*2^16-1);

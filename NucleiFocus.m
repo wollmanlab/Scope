@@ -26,7 +26,7 @@ classdef NucleiFocus < AutoFocus
         medium_dZ = 2;
         fine_window = 2;
         fine_dZ = 1;
-
+        smooth = 2;
     end
     methods
         function AF = checkFocus(AF,Scp,varargin)
@@ -213,25 +213,26 @@ classdef NucleiFocus < AutoFocus
         function Zfocus = PrimaryImageBasedScan(AF,Scp)
             tic
             Zfocus = AF.ImageBasedCoarseGrainScan(Scp);
-            img = Scp.snapImage;
+%             img = Scp.snapImage;
             Zfocus = AF.ImageBasedMediumGrainScan(Scp);
-            img = Scp.snapImage;
+%             img = Scp.snapImage;
             Zfocus = AF.ImageBasedFineGrainScan(Scp);
-            img = Scp.snapImage;
+%             img = Scp.snapImage;
             toc
         end
 
         function Zfocus = SecondaryImageBasedScan(AF,Scp)
             tic
             Zfocus = AF.ImageBasedMediumGrainScan(Scp);
-            img = Scp.snapImage;
+%             img = Scp.snapImage;
             Zfocus = AF.ImageBasedFineGrainScan(Scp);
-            img = Scp.snapImage;
+%             img = Scp.snapImage;
             toc
         end
 
 
         function Zfocus = ImageBasedScan(AF,Scp,window,dZ)
+%             AF.smooth = dZ;
             zinit = Scp.Z;
             zmax = zinit + window;
             zmin = zinit - window;
@@ -242,6 +243,8 @@ classdef NucleiFocus < AutoFocus
 %             Scp.mmc.stopSequenceAcquisition()
 %             Scp.mmc.startContinuousSequenceAcquisition(0)
 %             Scp.ContinousImaging = true;
+previous_channel = Scp.Channel;
+previous_exposure = Scp.Exposure;
 Scp.Channel = AF.channel;
 Scp.Exposure = AF.exposure;
 % Set Auto Shutter Off
@@ -254,6 +257,10 @@ Scp.mmc.setShutterOpen(1);
                 Scp.Z = z; 
                 score(zindex) = AF.calcMetric(Scp);
             end
+            
+            Zfocus = mean(steps(score==max(score)));
+            Scp.Z = Zfocus;
+            img = Scp.snapImage;
             % Set Auto Shutter On
 Scp.mmc.setAutoShutter(1);
 % Open Shutter (Auto Shutter must be off)
@@ -262,9 +269,8 @@ Scp.mmc.setShutterOpen(0);
 %             Scp.mmc.stopSequenceAcquisition()
 %             Scp.ContinousImaging = false;
 %             scatter(steps,score)
-            % Determine Best Z
-            Zfocus = mean(steps(score==max(score)));
-            Scp.Z = Zfocus;
+            Scp.Channel =  previous_channel;
+            Scp.Exposure = previous_exposure;
 
 
         end
@@ -282,6 +288,16 @@ Scp.mmc.setShutterOpen(0);
             % calculate metric
             switch lower(AF.metric)
                 case 'sobel'
+                    hx = fspecial('sobel');
+                    hy = fspecial('sobel')';
+                    gx=imfilter(img,hx);
+                    gy=imfilter(img,hy);
+                    metric=mean(hypot(gx(:),gy(:)));
+                case 'sobel_af'
+                    img = img(1000:end,:);
+                    img = imgaussfilt(img,AF.smooth);
+                    bkg = imgaussfilt(img,AF.smooth*10);
+                    img = img-bkg;
                     hx = fspecial('sobel');
                     hy = fspecial('sobel')';
                     gx=imfilter(img,hx);

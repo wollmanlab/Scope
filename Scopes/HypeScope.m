@@ -12,7 +12,7 @@ classdef HypeScope < Scope
         AF = TheseusFocus;
         LargeMove = 500; % large movement, i.e. break the move into steps and autofocus in between 
         Notifications = Notifications;
-        Sensor = DHT11('COM17');
+%         TempHumiditySensor = DHT11('COM17');
     end
     
     

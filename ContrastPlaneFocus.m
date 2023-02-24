@@ -58,8 +58,9 @@ classdef ContrastPlaneFocus < NucleiFocus
             % Update Groups to be sections
             for i = 1:length(AF.Pos.Labels)
                 if AF.Pos.Hidden(i)==0
-                    g = split(AF.Pos.Labels{i},'-');
-                    AF.Pos.Group{i} = g{2};
+                    
+                    g = split(AF.Pos.Labels{i},'-Pos');
+                    AF.Pos.Group{i} = g{1};
                 end
             end
             AF.groups = unique(AF.Pos.Group(AF.Pos.Hidden==0));
