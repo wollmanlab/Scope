@@ -1250,7 +1250,7 @@ classdef (Abstract) Scope < handle
 
             switch arg.postype
                 case 'standard'
-                    Pos = Scp.Pos.La(PL,'axis',arg.axis);
+                    Pos = Positions(PL,'axis',arg.axis);
                 case 'relative'
                     Pos = RelativePositions(PL,'axis',arg.axis);
                 case 'beads'
