@@ -1,107 +1,126 @@
 classdef FluidicsData < handle
+
+    %%
+    % FlowData = Copy_of_FluidicsData
+    % FlowData.start_Gui
+    % FlowData.send_command(FlowData.build_command('Valve',['A','B','C'],'TBS+3'),Scp)
+    %%
     properties
-        Rounds = [fliplr(1:24),25];%[1:25];
-        Protocols = {'strip','hybe'};
+        device = 'Fluidics'
+        available = false;
+        log = 'C:/GitRepos/Fluidics/Status.txt';
+        Rounds = [1:25];
+        Protocols = {'Strip','Hybe'};
         FlowGroups = {'ABC','DEF'};
-        Round
-        Protocol
-        Group
-        Image = false;
-        Flow = true;
-        Completed_Tasks = {}
-        Single = false;
-        strip_wait_per_coverslip = 230; 
-        hybe_wait_per_coverslip = 340; % 350
-        initial_protocol = 'strip';
-        initial_group = 'ABC';
         Tasks
-        Parallel = true;
-        start_round = int2str(1);
-        start_protocol = 'strip';
-        start_group = 'ABC';
-        skip_flow = false;
-        skip_image= false;
-        start_idx = 1;
         current_idx = 1;
-        python = 'C:/Users/wollmanlab/miniconda3/envs/py27/python';
-        fluidics = 'C:/Repos/fluidics/Chamber_Fluidics.py';
+        python = 'C:/Users/wollmanlab/miniconda3/envs/py37/python';
+        fluidics = 'C:\GitRepos\Fluidics\Fluidics.py';
+        gui = 'C:\GitRepos\Fluidics\GUI.py';
         extras = '';
-        start = clock;
-        wait_time = 0;
+        n_coverslips = 1;
+        coverslips;
+        all_wells;
+        wells;
+        protocol;
+        other;
+        hybe;
+        AcqData;
+
     end
+
     methods
         function FlowData = FluidicsData()
             FlowData.update_FlowData();
         end
 
-        function fill_wells_TBS(FlowData,Scp)
-            wells = [FlowData.FlowGroups{1:end}];
+        function start_Gui(FlowData)
+            system([FlowData.python,' ',FlowData.gui,'-f ',FlowData.device,' &'])
+        end
+
+        function start_Fluidics(FlowData)
+            system([FlowData.python,' ',FlowData.fluidics,'-f ',FlowData.device,' &'])
+        end
+
+        function command = build_command(FlowData,protocol,wells,other)
             chambers = ['[',repmat(',', [1, (2*size(wells,2))-1]),']'];
             chambers(2*(1:size(wells,2))) = wells(1:size(wells,2));
-            protocol = 'valve+3';
-            command = ['TBS_',chambers,'_',protocol];
-            Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command],'all',true);
-            system([FlowData.python,' ',FlowData.fluidics,'  ',command,' ',FlowData.extras,' &'])
+            command = [protocol,'*',chambers,'*',other];
+        end
+
+        function fill_wells_TBS(FlowData,Scp)
+            command = FlowData.build_command('Valve',FlowData.all_wells,'TBS+3');
+            FlowData.send_command(command,Scp);
         end
 
         function flow(FlowData,Scp)
-            while etime(clock,FlowData.start)<FlowData.wait_time
-                Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ','Waiting For Previous Flow to Finish'],'all',true);
-                disp('Waiting For Previous Flow to Finish')
-                pause(60)
+            command = FlowData.build_command(FlowData.protocol,FlowData.wells,FlowData.other);
+            if ~isempty(FlowData.wells)
+                FlowData.send_command(command,Scp)
             end
-            chambers = '[';
+        end
+
+        function wells = get.wells(FlowData)
             wells = FlowData.Tasks{FlowData.current_idx,3};
-            for g = 1:size(wells,2)
-                group = wells(g);
-                if g<size(wells,2)
-                    chambers = [chambers,group,','];
-                else
-                    chambers = [chambers,group,']'];
-                end
-            end
-            hybe = FlowData.Tasks{FlowData.current_idx,1};
+        end
+
+        function protocol = get.protocol(FlowData)
             protocol = FlowData.Tasks{FlowData.current_idx,2};
-            command = ['Hybe',hybe,'_',chambers,'_',protocol];
-            if strcmp(protocol,'strip')
-                FlowData.wait_time = FlowData.strip_wait_per_coverslip*size(wells,2) + 600+30;
-            elseif strcmp(protocol,'hybe')
-                FlowData.wait_time = FlowData.hybe_wait_per_coverslip*size(wells,2) + 600+30;
+        end
+
+        function other = get.other(FlowData)
+            other = FlowData.Tasks{FlowData.current_idx,1};
+        end
+
+        function hybe = get.hybe(FlowData)
+            hybe = split(FlowData.other,'Hybe');
+            hybe = hybe{end};
+        end
+
+        function available = get.available(FlowData)
+            message = fileread(FlowData.log);
+            if contains(message,'Finished')
+                available = true;
+            elseif contains(message,'Available')
+                available = true;
             else
-                FlowData.wait_time = FlowData.hybe_wait_per_coverslip*size(wells,2) + 600+30;
+                available = false;
             end
-            FlowData.start = clock;
-            Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command],'all',true);
-            system([FlowData.python,' ',FlowData.fluidics,'  ',command,' ',FlowData.extras,' &'])
         end
 
-        function set.start_round(FlowData,start_round)
-            FlowData.start_round = start_round;
-            FlowData.update_FlowData();
+        function writelog(FlowData,message)
+            disp('Sending Command')
+            fileID = fopen(FlowData.log,'w');
+            fprintf(fileID,message);
+            fclose(fileID);
         end
 
-        function set.start_group(FlowData,start_group)
-            FlowData.start_group = start_group;
-            FlowData.update_FlowData();
+        function send_command(FlowData,message,Scp)
+            FlowData.wait_until_available()
+            FlowData.writelog(['Command:',message]);
+            Scp.Notifications.sendSlackMessage(Scp,['Flowing ',message]);
         end
 
-        function set.start_protocol(FlowData,start_protocol)
-            FlowData.start_protocol = start_protocol;
-            FlowData.update_FlowData();
-        end
-
-        function set.skip_flow(FlowData,skip_flow)
-            FlowData.skip_flow = skip_flow;
-            FlowData.update_FlowData();
-        end
-
-        function set.skip_image(FlowData,skip_image)
-            FlowData.skip_image = skip_image;
-            FlowData.update_FlowData();
+        function wait_until_available(FlowData)
+            start = clock;
+            while ~FlowData.available
+                fprintf('\n');
+                x = etime(clock, start);
+                if x<60
+                    fprintf('Waiting: %.2f seconds',x)
+                elseif x<(60*60)
+                    fprintf('Waiting: %.2f minutes',x/60)
+                else
+                    fprintf('Waiting: %.2f hours',x/(60*60))
+                end
+                pause(10)
+            end
+            fprintf('\n');
         end
 
         function update_FlowData(FlowData)
             % Update Steps
+
             Steps = cell(size(FlowData.Rounds,1)*size(FlowData.Rounds,1)*size(FlowData.FlowGroups,1),3);
             ticker = 0;
             for hybe = FlowData.Rounds
@@ -124,23 +143,12 @@ classdef FluidicsData < handle
                     FlowData.Tasks((2*i)-1,1:3) = Steps(i,:);
                 end
             end
-
-            for i=1:size(FlowData.Tasks,1)
-                if (strcmp(FlowData.Tasks(i,1),{FlowData.start_round}))&(strcmp(FlowData.Tasks(i,2),{FlowData.start_protocol}))&(strcmp(FlowData.Tasks(i,3),{FlowData.start_group}))
-                    FlowData.start_idx = i;
-                    %disp(FlowData.start_idx)
-                    if FlowData.start_idx>1
-                        i = FlowData.start_idx-1;
-                        FlowData.Tasks(1:i,1:6) = cell(i,6);
-                    end
-                    if FlowData.skip_flow
-                        FlowData.Tasks(i,1:3) = cell(3,1);
-                    end
-                    if FlowData.skip_image
-                        FlowData.Tasks(i,4:6) = cell(3,1);
-                    end
-                end
+            FlowData.all_wells = [FlowData.FlowGroups{1:end}];
+            FlowData.coverslips = cell(length(FlowData.wells),1);
+            for i=1:length(FlowData.wells)
+                FlowData.coverslips{i} = FlowData.wells(i);
             end
+            FlowData.n_coverslips = size(FlowData.coverslips,1);
         end
     end
 end

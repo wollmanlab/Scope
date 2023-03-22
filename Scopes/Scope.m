@@ -381,6 +381,7 @@ classdef (Abstract) Scope < handle
                         img = Scp.snapImage;
                     end
                     try
+                        img = Scp.transform_image(img);
                         imwrite(uint16(img*2^16-1),fullfile(Scp.pth,acqname,filename));%AOY added -1
                     catch  %#ok<CTCH>
                         errordlg('Cannot save image to harddeive. Check out space on drive');
@@ -676,6 +677,7 @@ classdef (Abstract) Scope < handle
             arg.calibrate = false;
             arg.autoshutter = true;
             arg.continousimaging = false;
+            arg.viewstitched = true;
             %arg.delay = false;
             arg = parseVarargin(varargin,arg);
 
@@ -686,6 +688,8 @@ classdef (Abstract) Scope < handle
             else
                 acqname = arg.acqname;
             end
+
+            Scp.Notifications.sendSlackMessage(Scp,['Imaging ',acqname]);
 
             if ~isempty(Scp.shiftfilepath)
                 Scp.initShiftFile
@@ -759,6 +763,15 @@ classdef (Abstract) Scope < handle
             if arg.continousimaging
                 Scp.mmc.stopSequenceAcquisition()
                 Scp.ContinousImaging = false; 
+            end
+
+            if arg.viewstitched
+                for z = 1:length(AcqData)
+%                     try
+                    Scp.viewAcq('channel',AcqData(z).Channel,'well',Scp.Pos.Well);
+%                     catch
+%                     end
+                end
             end
 
         end
@@ -1699,7 +1712,7 @@ classdef (Abstract) Scope < handle
             arg.msk = true(Plt.sz);
             arg.wells = Plt.Wells;
             arg.axis={'XY'};
-            arg.sitesperwell = [1 1]; % [x y]
+            arg.sitesperwell = [0 0]; % [x y]
             arg.alignsites = 'center';
             arg.sitesshape = 'grid';
             arg.spacing = 1; % percent of frame size
@@ -1717,6 +1730,13 @@ classdef (Abstract) Scope < handle
             arg.manualoverride = false;
             arg.enforceplatingdensity=Scp.EnforcePlatingDensity;
             arg = parseVarargin(varargin,arg);
+
+            if arg.sitesperwell(1)==0
+                arg.sitesperwell(1) = round(Scp.Chamber.wellDimensions(1)/(Scp.Width*Scp.PixelSize*arg.spacing));
+            end
+            if arg.sitesperwell(2)==0
+                arg.sitesperwell(2) = round(Scp.Chamber.wellDimensions(2)/(Scp.Height*Scp.PixelSize*arg.spacing));
+            end
 
             %Input cleansing
             if arg.pixelsize<=0
@@ -1889,6 +1909,16 @@ classdef (Abstract) Scope < handle
                 Scp.Pos = Pos;
             end
 
+            %% Ensure not outside of stage limits
+             hidden = zeros(length(Scp.Pos.Labels),1);
+             X = Pos.List(:,1);
+             Y = Pos.List(:,2);
+             hidden(X>Scp.X_stage_max_limit) = 1;
+             hidden(X<Scp.X_stage_min_limit) = 1;
+             hidden(Y>Scp.Y_stage_max_limit) = 1;
+             hidden(Y<-Scp.Y_stage_min_limit) = 1;
+             Pos.Hidden = hidden;
+
         end
 
         function PossChannel = getPossibleChannels(Scp)
@@ -2042,17 +2072,17 @@ classdef (Abstract) Scope < handle
                         Scp.mmc.clearCircularBuffer()
                         pause(1);
                         command = 'Alert : Camera Failed to Snap Image';
-                        Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command],'all',true);
+                        Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command]);
                         try
                             Scp.mmc.snapImage;
                             timg=Scp.mmc.getTaggedImage;
                             img=timg.pix;
                             command = 'Camera Recovered';
-                            Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command],'all',true);
+                            Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command]);
                         catch
                             Scp.mmc.clearCircularBuffer()
                             command = 'Servere Alert : Camera Did Not Recover. I Need Help!';
-                            Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command],'all',true);
+                            Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command]);
                             y = 'y';
                             n = 'n';
                             c = input("continue? (y/n))");
@@ -2423,7 +2453,7 @@ classdef (Abstract) Scope < handle
                         Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z-2)
                         if attempt>2
                             message = ['Stage is not able to get to this position (Z) Attempt #',int2str(attempt)];
-                            Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+                            Scp.Notifications.sendSlackMessage(Scp,message);
                         end
                     end
                     Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
@@ -2436,7 +2466,7 @@ classdef (Abstract) Scope < handle
                 end
                 if attempt==max_attempts
                     message = 'Stage is not able to get to this position (Z) Need Help';
-                    Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+                    Scp.Notifications.sendSlackMessage(Scp,message);
                     answer = questdlg(['Stage is not able to get to this position',newline,'If Position Is not Good Click Hide'], ...
                         'Stage Needs Help', ...
                         'Okay','Hide','');
@@ -2503,7 +2533,7 @@ classdef (Abstract) Scope < handle
                 case 'None'
                     throw(MException('OptovarFetchError', 'ScopeStartup did not handle optovar'));
                 case 'Zeiss_Axio_0'
-                    Mag = 1;
+                    Mag = 1/0.7;
                 case 'IncuScope_0'
                     Mag = 1;
                 case 'Ninja'
@@ -2609,7 +2639,7 @@ classdef (Abstract) Scope < handle
                     if attempt>1
                         pause(attempt*30)
                         message = ['Stage is not able to get to this position (XY) Attempt #',int2str(attempt)];
-                        Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+                        Scp.Notifications.sendSlackMessage(Scp,message);
                         Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1)-50,XY(2)-50)
                     end
                     Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
@@ -2619,7 +2649,7 @@ classdef (Abstract) Scope < handle
                 end
                 if attempt==max_attempts
                     message = 'Stage is not able to get to this position (XY) Need Help';
-                    Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+                    Scp.Notifications.sendSlackMessage(Scp,message);
                     answer = questdlg(['Stage is not able to get to this position',newline,'If Position Is not Good Click Hide'], ...
                         'Stage Needs Help', ...
                         'Okay','Hide','');
@@ -2984,6 +3014,11 @@ classdef (Abstract) Scope < handle
             colorbar()
             filename = [arg.acq_name,' Well ',arg.well,' ',arg.channel];
             title(filename)
+        end
+
+        function img = transform_image(Scp,img)
+            % Overwrite in each scope class so that all images are rotated
+            % and flipped in the same way
         end
     end
 end

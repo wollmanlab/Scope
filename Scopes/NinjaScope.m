@@ -5,6 +5,13 @@ classdef NinjaScope < Scope
        Notifications = Notifications;
        AF = PerfectFocus;
        TempHumiditySensor = DHT11('COM9');
+       FlowData = FluidicsData;
+       X_stage_max_limit = 55000;
+       X_stage_min_limit = -55000;
+       Y_stage_max_limit = 37500;
+       Y_stage_min_limit = -37500;
+       X_offset = 0; % Distance of Scp.X=0 from center of stage
+       Y_offset = 0; % Distance of Scp.Y=0 from center of stage
     end
     
     methods

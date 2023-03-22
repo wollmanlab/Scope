@@ -8,7 +8,7 @@ classdef NucleiFocus < AutoFocus
         dZ = 50;
         max_dZ = 500;
         resolution=1;
-        n_neighbors = 3;
+        n_neighbors = 10;
         acceleration = 1/5;
         scale = 2;
         resize=1;
@@ -16,7 +16,7 @@ classdef NucleiFocus < AutoFocus
         iteration = 1;
         max_iterations = 3;
         distance_thresh = 5000;
-        metric='Contrast_1D';
+        metric='sobel_af';
         ticker = 0;
         check_frequency = 0;
 
@@ -44,8 +44,7 @@ classdef NucleiFocus < AutoFocus
                 AF.ticker = AF.ticker+1;
             end
         end
-
-
+        
         function Zfocus = ImageBasedFineScan(AF,Scp)
             if AF.verbose
                 figure(158),

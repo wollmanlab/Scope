@@ -22,6 +22,7 @@ classdef Positions < handle
         current = 0;
         circular = true;
         isOptimized
+        Well = '';
     end
     
     properties (Dependent = true)
@@ -30,6 +31,15 @@ classdef Positions < handle
     end
     
     methods
+
+        function save(Pos)
+            save(['C:\Users\wollmanlab\Pos_',Pos.Well,'.mat'], 'Pos');
+        end
+
+        function load(Pos,Well)
+            Pos = load(['C:\Users\wollmanlab\Pos_',Well,'.mat']);
+            Pos = Pos.Pos;
+        end
         
         function remove(Pos,name)
             ix=ismember(Pos.Labels,name); 

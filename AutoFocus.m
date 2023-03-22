@@ -10,9 +10,21 @@ classdef (Abstract) AutoFocus < handle
         start_Z = [];
         surface_method = 'poly23';
         alert_level = 2;
+        Well = '';
     end
     
     methods
+
+        function save(AF)
+            save(['C:\Users\wollmanlab\AF_',AF.Well,'.mat'], 'AF');
+        end
+
+        function load(AF,Well)
+            AF = load(['C:\Users\wollmanlab\AF_',Well,'.mat']);
+            AF = AF.AF;
+        end
+
+
         function [AF,Pos] = findFocus(AF,Scp,varargin)
             Pos = Scp.Pos;
             AF.foundFocus = false;
@@ -67,7 +79,7 @@ classdef (Abstract) AutoFocus < handle
                 %Scp.Notifications.sendSlackMessage(Scp,message);
 
                 %message = ['Autofocus didnt find focus',newline,'Attempting to Predict Focus'];
-                Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+                Scp.Notifications.sendSlackMessage(Scp,message);
 
             end
             disp(message)
@@ -108,7 +120,7 @@ classdef (Abstract) AutoFocus < handle
                 %Scp.Notifications.sendSlackMessage(Scp,message);
 
                 %message = ['Autofocus didnt find focus',newline,'Attempting to Scan for Focus'];
-                Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+                Scp.Notifications.sendSlackMessage(Scp,message);
             end
             disp(message)
             dZ = linspace(-AF.lower_z, AF.upper_z, 1+(AF.lower_z+AF.upper_z)/AF.step);
@@ -131,7 +143,7 @@ classdef (Abstract) AutoFocus < handle
             %uiwait(msgbox(message));
 
             % Add Option To Hide Position In Future
-            Scp.Notifications.sendSlackMessage(Scp,message,'all',true);
+            Scp.Notifications.sendSlackMessage(Scp,message);
             answer = questdlg(['Autofocus didnt find focus and Needs Help',newline,'Turn On Live',newline,'Manually Find Focus',newline,'Then Click OK',newline,'If Position Is not Good Click Hide'], ...
                 'AutoFocus Needs Help', ...
                 'Okay','Hide','');

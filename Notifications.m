@@ -47,6 +47,13 @@ classdef Notifications
         function sendSlackMessage(A,Scp,message,varargin)
             arg.all = false;
             arg = parseVarargin(varargin,arg);
+
+            labels = Scp.Pos.Labels(Scp.Pos.Hidden==0);
+            label = labels{1};
+            label = strsplit(label,'-');
+            Well = label{1};
+            message = [Scp.Dataset,' ',message,' ',Well];
+
             [user,hook] = A.populateSlackAddresses(Scp);
             if arg.all
                 status = SendSlackNotification(hook,message);

@@ -3,7 +3,7 @@ classdef ContrastPlaneFocus < NucleiFocus
         groups
         group_focuses
         radius = 1500/2;
-        method = 'median';
+        method = 'plane';
         n_pos = 3;
 
     end
@@ -45,16 +45,17 @@ classdef ContrastPlaneFocus < NucleiFocus
             AF.group_focuses = zeros(length(AF.groups),1);
         end
 
-        function AF = filterPositions(AF,percentage)
-            
-            
-        end
 
         function AF = calculateZ(AF,Scp,varargin)
 
             arg.filter = true;
             arg.percentage = 0.75;
             arg = parseVarargin(varargin,arg);
+
+            Scp.Notifications.sendSlackMessage(Scp,'Calculating Autofocus');
+
+            backup_type = Scp.AutoFocusType; 
+            Scp.AutoFocusType='none';
             % Update Groups to be sections
             for i = 1:length(AF.Pos.Labels)
                 if AF.Pos.Hidden(i)==0
@@ -156,6 +157,7 @@ classdef ContrastPlaneFocus < NucleiFocus
                 AF.Pos.axis = {'X','Y','Z'};
             end
             AF.Pos.List = global_XYZ;
+            Scp.AutoFocusType=backup_type;
         end
 
         function AF = updateZ(AF,Scp)
@@ -203,6 +205,7 @@ classdef ContrastPlaneFocus < NucleiFocus
                 AF.Pos.axis = {'X','Y','Z'};
             end
             AF.Pos.List = global_XYZ;
+            AF.save_AF;
         end
 
 

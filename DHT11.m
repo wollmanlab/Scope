@@ -8,8 +8,11 @@ classdef DHT11
     methods
         function Sensor = DHT11(comPort)
             Sensor.comPort = comPort;
-            Sensor.serial = serialport(Sensor.comPort,9600);
-            configureTerminator(Sensor.serial,"CR/LF");
+            try
+                Sensor.serial = serialport(Sensor.comPort,9600);
+                configureTerminator(Sensor.serial,"CR/LF");
+            catch
+            end
         end
 
         function temp = getTemp(Sensor)
