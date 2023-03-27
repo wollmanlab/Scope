@@ -18,6 +18,7 @@ classdef NinjaScope < Scope
         
         function Scp = NinjaScope()
             Scp@Scope();
+            Scp.dXY = [Scp.X_offset Scp.Y_offset];
             %addpath('C:\Fiji.app\scripts')
             %addpath('C:\Program Files\Micro-Manager-2.0gamma')
             import mmcorej.*;

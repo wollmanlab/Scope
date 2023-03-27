@@ -381,7 +381,7 @@ classdef (Abstract) Scope < handle
                         img = Scp.snapImage;
                     end
                     try
-                        img = Scp.transform_image(img);
+                        img = Scp.microscope_correct_image(img);
                         imwrite(uint16(img*2^16-1),fullfile(Scp.pth,acqname,filename));%AOY added -1
                     catch  %#ok<CTCH>
                         errordlg('Cannot save image to harddeive. Check out space on drive');
@@ -588,6 +588,23 @@ classdef (Abstract) Scope < handle
             img(img>1)=1;
         end
 
+        function FrameID = getCurrentFrameID(Scp)
+            acqs = dir(Scp.pth);
+            FrameID = 0;
+            for i=1:length(acqs)
+                acq = acqs(i);
+                if (acq.isdir)&(strfind(acq.name,'_'))
+                    id = split(acq.name,'_');
+                    id = id{end};
+                    id = str2double(id);
+                    if id>FrameID
+                        FrameID = id;
+                    end
+                end
+            end
+
+        end
+
         function acqname = initAcq(Scp,AcqData,varargin)
 
             arg.baseacqname='acq';
@@ -630,7 +647,8 @@ classdef (Abstract) Scope < handle
             Scp.FrameCount = zeros(Scp.Pos.N,1);
 
             %% update FrameID and create
-            Scp.frameID = Scp.frameID+1;
+
+            Scp.frameID = Scp.getCurrentFrameID()+1;
             acqname = [arg.baseacqname '_' num2str(Scp.frameID)];
 
             %% set up the MM acqusition
@@ -1297,8 +1315,8 @@ classdef (Abstract) Scope < handle
             arg.acqdata(1).Channel = 'DeepBlue';
             arg.acqdata(1).Exposure = 50; %
             arg.stitched_pixel_size = 10;
-            arg.input_pixel_size = 0.326;
-            arg.output_pixel_size = 0.103;
+            arg.input_pixel_size = Scp.PixelSize;
+            arg.output_pixel_size = Scp.PixelSize/(40/10);
             arg.rotate = 90; % 90,180,270
             arg.background = false;
             arg.flip = 2; %dim
@@ -1447,8 +1465,9 @@ classdef (Abstract) Scope < handle
             arg.acqdata = AcquisitionData;
             arg.acqdata(1).Channel = 'DeepBlue';
             arg.acqdata(1).Exposure = 10; %
-            arg.stitched_pixel_size = 10;
-            arg.pixel_size = 0.490;
+            arg.zindex = 1;
+            arg.stitched_pixel_size = Scp.PixelSize*20;
+            arg.pixel_size = Scp.PixelSize;
             arg.rotate = 90;
             arg.background = false;
             arg.flip = 0; %dim
@@ -1477,12 +1496,19 @@ classdef (Abstract) Scope < handle
             end
 
             %% Load and Stitch
-            md = Metadata(Scp.pth);
-            [Images, idxes] = md.stkread('acq', acq_name, 'flatfieldcorrection', false);
+%             md = Metadata(Scp.pth);
+%             [Images, idxes] = md.stkread('acq', acq_name, 'flatfieldcorrection', false);
+%             XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
+
+            md = Metadata([Scp.pth,'\',arg.acq_name]);
+            resize = arg.pixel_size/arg.stitched_pixel_size;
+            [Images, idxes] = md.stkread('acq', arg.acq_name, 'flatfieldcorrection', false,'Channel',arg.acqdata(1).Channel,'Zindex',arg.zindex,'resize',resize);
             XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
+
             Posnames_Cell = md.getSpecificMetadataByIndex('Position', idxes);
             stitched = Scp.stitch(Images,XY_Cell, ...
-                'pixel_size',arg.pixel_size, ...
+                'pixel_size',arg.stitched_pixel_size, ...
+                'stitched_pixel_size',arg.stitched_pixel_size,...
                 'rotate',arg.rotate, ...
                 'flip',arg.flip, ...
                 'border',arg.border, ...
@@ -1505,13 +1531,11 @@ classdef (Abstract) Scope < handle
             updated_posnames = cell(size(Images,3),1);
             x = arg.x;
             y = arg.y;
-            XY_coordinates = round((cell2mat(XY_Cell)-min(cell2mat(XY_Cell)))/10)+1;
+            XY_coordinates = round((cell2mat(XY_Cell)-min(cell2mat(XY_Cell)))/arg.stitched_pixel_size)+1;
             XY_Limits = max(XY_coordinates)+arg.border;
-
             for i=1:size(Images,3)
                 img_coordinates = XY_coordinates(i,:);
                 img = Images(:,:,i);
-                % Correct Orientation
                 if arg.rotate~=0
                     img = imrotate(img,arg.rotate);
                 end
@@ -1519,8 +1543,8 @@ classdef (Abstract) Scope < handle
                     img = flip(img,arg.flip);
                 end
                 % Resize Image
-                shape = round(size(img)*arg.pixel_size/arg.stitched_pixel_size)-1;
-                %populate
+                shape = size(img);
+                %populatenearest
                 x_lower_bound = img_coordinates(x);
                 x_upper_bound = x_lower_bound+shape(x);
                 y_lower_bound = img_coordinates(y);
@@ -1560,15 +1584,19 @@ classdef (Abstract) Scope < handle
             Scp.Pos.Hidden = hidden;
             if arg.verbose
                 figure(12)
-                imshow(imadjust(stitched))
+                stitched = stitched-prctile(stitched(labelMask>0),5);
+                stitched = stitched/prctile(stitched(labelMask>0),95);
+                imshow(stitched)
             end
         end
 
         function stitched = stitch(Scp,Images,XY_Cell,varargin)
+            arg.pixel_size = Scp.PixelSize;
             arg.stitched_pixel_size = 10;
-            arg.pixel_size = 0.490;
+            arg.pixel_size = Scp.PixelSize;
             arg.rotate = 90;
             arg.background = false;
+            arg.sigma = 25;
             arg.flip = 0; %dim
             arg.x = 1; %dim
             arg.y = 2; %dim
@@ -1585,7 +1613,9 @@ classdef (Abstract) Scope < handle
 %                 waitbar(i/size(Images,3), f, sprintf('Progress: %d %%', floor(i/size(Images,3)*100)));
                 img_coordinates = XY_coordinates(i,:);
                 img = Images(:,:,i);
-%                 img = img -imgaussfilt(img,50);
+                if arg.sigma>0
+                    img = img -imgaussfilt(img,arg.sigma);
+                end
 %                 %%
 %                 img = img-mean(img(:));
 %                 img = img/std(img(:));
@@ -2622,7 +2652,7 @@ classdef (Abstract) Scope < handle
             if ~out
                 disp(['Dist: ',num2str(dist)])
                 disp(['Current X: ',num2str(currXY(1)),' Desired X: ',num2str(XY(1))])
-                disp(['Current Y: ',num2str(currXY),' Desired Y: ',num2str(XY(2))])
+                disp(['Current Y: ',num2str(currXY(2)),' Desired Y: ',num2str(XY(2))])
             end
         end
 
@@ -2961,8 +2991,8 @@ classdef (Abstract) Scope < handle
             arg.path = Scp.pth;
             arg.channel = 'DeepBlue';
             arg.acq_name = '';
-            arg.pixel_size = 0.490;
-            arg.acq_name = '';
+            arg.pixel_size = Scp.PixelSize;
+            arg.acq_name = '';  
             arg.rotate = 90;
             arg.flip = 0;
             arg.border = 500;
@@ -2970,7 +3000,7 @@ classdef (Abstract) Scope < handle
             arg.y = 2;
             arg.well = '';
             arg.max_figures = 20;
-            arg.stitched_pixel_size = 10;
+            arg.stitched_pixel_size = Scp.PixelSize*20;
             arg.zindex = 1;
             arg = parseVarargin(varargin,arg);
             if strcmp(arg.acq_name,'')
@@ -2978,11 +3008,11 @@ classdef (Abstract) Scope < handle
             end
 
             md = Metadata([Scp.pth,'\',arg.acq_name]);
-            
-            [Images, idxes] = md.stkread('acq', arg.acq_name, 'flatfieldcorrection', false,'Channel',arg.channel,'Zindex',arg.zindex);
+            resize = arg.pixel_size/arg.stitched_pixel_size;
+            [Images, idxes] = md.stkread('acq', arg.acq_name, 'flatfieldcorrection', false,'Channel',arg.channel,'Zindex',arg.zindex,'resize',resize);
             XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
             stitched = Scp.stitch(Images-median(Images,3),XY_Cell, ...
-                'pixel_size',arg.pixel_size, ...
+                'pixel_size',arg.stitched_pixel_size, ...
                 'rotate',arg.rotate, ...
                 'flip',arg.flip, ...
                 'border',arg.border, ...
@@ -3016,7 +3046,7 @@ classdef (Abstract) Scope < handle
             title(filename)
         end
 
-        function img = transform_image(Scp,img)
+        function img = microscope_correct_image(Scp,img)
             % Overwrite in each scope class so that all images are rotated
             % and flipped in the same way
         end

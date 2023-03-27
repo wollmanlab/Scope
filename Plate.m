@@ -49,7 +49,7 @@ classdef Plate < Chamber
                     P.x0y0 = [0 0]; %FIX P.x0y0 = [40000 -20000]; %FIX
                     P.directionXY = [-1 1];
                     P.wellSpacingXY = [40000 40000];
-                    P.Wells = { 'A'};
+                    P.Wells = { 'M'};
                 case 'Costar96 (3904)'
                     P.numOfsubChambers=96;
                     P.type = type;

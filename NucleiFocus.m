@@ -3,7 +3,7 @@ classdef NucleiFocus < AutoFocus
         verbose=true;
         channel = 'DeepBlue';
         exposure = 50;
-        Pos;
+        Pos = Positions;
         B;
         dZ = 50;
         max_dZ = 500;

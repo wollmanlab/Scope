@@ -31,6 +31,28 @@ classdef ContrastPlaneFocus < NucleiFocus
             AF.foundFocus = true;
         end
 
+        function AF = createPostions(AF,Pos,varargin)
+            arg.filter = true;
+            arg.percentage = 0.75;
+            arg = parseVarargin(varargin,arg);
+            AF.Pos = Positions;
+            AF.Pos.List = Pos.List(Pos.Hidden==0,1:2);
+            AF.Pos.Labels = Pos.Labels(Pos.Hidden==0);
+            AF.Pos.Hidden = Pos.Hidden(Pos.Hidden==0);
+            AF.Pos.Group = Pos.Group(Pos.Hidden==0);
+            AF.Pos.Well = Pos.Well;
+            good_labels = 1:length(AF.Pos.Labels);
+            if arg.filter
+                if floor(length(good_labels)*arg.percentage)>AF.n_neighbors
+                    filtered_labels = datasample(good_labels,floor(length(good_labels)*arg.percentage),'Replace',false);
+                else
+                    filtered_labels = datasample(good_labels,AF.n_neighbors,'Replace',false);
+                end
+                AF.Pos.Hidden(filtered_labels) = 1;
+            end
+
+        end
+
         function AF = setupPositions(AF,Scp)
             uiwait(msgbox(['Create Atleast 4 Positions per sample']))
             AF.Pos = Scp.createPositionFromMM;
@@ -48,7 +70,7 @@ classdef ContrastPlaneFocus < NucleiFocus
 
         function AF = calculateZ(AF,Scp,varargin)
 
-            arg.filter = true;
+%             arg.filter = true;
             arg.percentage = 0.75;
             arg = parseVarargin(varargin,arg);
 
@@ -81,15 +103,15 @@ classdef ContrastPlaneFocus < NucleiFocus
                 good_labels = 1:length(AF.Pos.Labels);
                 good_labels = good_labels(m);
 
-                if arg.filter
-                    filtered_labels = datasample(good_labels,floor(length(good_labels)*arg.percentage),'Replace',false);
-                    AF.Pos.Hidden(filtered_labels) = 1;
-                    m1 = ismember(AF.Pos.Group,AF.groups{G});
-                    m2 = AF.Pos.Hidden==0;
-                    m = m1&m2;
-                    good_labels = 1:length(AF.Pos.Labels);
-                    good_labels = good_labels(m);
-                end
+%                 if arg.filter
+%                     filtered_labels = datasample(good_labels,floor(length(good_labels)*arg.percentage),'Replace',false);
+%                     AF.Pos.Hidden(filtered_labels) = 1;
+%                     m1 = ismember(AF.Pos.Group,AF.groups{G});
+%                     m2 = AF.Pos.Hidden==0;
+%                     m = m1&m2;
+%                     good_labels = 1:length(AF.Pos.Labels);
+%                     good_labels = good_labels(m);
+%                 end
                 XYZ = zeros(sum(m),3);
                 XYZ(:,1:2) = AF.Pos.List(m,1:2);
                 % Go To Center of section

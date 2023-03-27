@@ -155,10 +155,10 @@ classdef Positions < handle
             end
         end
         
-        function save(Pos,fullfilepath)
-            PL = Pos.getMMPosList;
-            PL.save(fullfilepath);
-        end
+%         function save(Pos,fullfilepath)
+%             PL = Pos.getMMPosList;
+%             PL.save(fullfilepath);
+%         end
         
         function Pos = add(Pos,xy,labels)
             if any(ismember(labels,Pos.Labels))
