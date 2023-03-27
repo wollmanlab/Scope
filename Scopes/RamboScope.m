@@ -7,12 +7,12 @@ classdef RamboScope < Scope
         Notifications = Notifications;
         TempHumiditySensor = DHT11('COM14'); %FIX
         FlowData = FluidicsData;
-        X_stage_max_limit = 55000;
-        X_stage_min_limit = -55000;
-        Y_stage_max_limit = 37500;
-        Y_stage_min_limit = -37500;
-        X_offset = -67000; % Distance of Scp.X=0 from center of stage
-        Y_offset = -43000; % Distance of Scp.Y=0 from center of stage
+        X_stage_max_limit = 110000;
+        X_stage_min_limit = 0;
+        Y_stage_max_limit = 75000;
+        Y_stage_min_limit = 0;
+        X_offset = 67000; % Distance of Scp.X=0 from center of stage
+        Y_offset = 43000; % Distance of Scp.Y=0 from center of stage
     end
     
     
@@ -20,6 +20,7 @@ classdef RamboScope < Scope
         
         function Scp = RamboScope()
             Scp@Scope; 
+            Scp.dXY = [Scp.X_offset Scp.Y_offset];
             disp('My name is Rambo and I am a microscope. ')
             Scp.FlowData.device = 'RamboFluidics';
             addpath('C:\Program Files\Micro-Manager-2.0gamma')
@@ -68,8 +69,30 @@ classdef RamboScope < Scope
                     disp('No autofocus used')
             end
         end
+        function setXY(Scp,XY)
+            try % Timeout error on hype scope where um misses task completely signal
+                Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
+                Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+            catch % try again
+                disp('Error during stage movement. Trying again')
+                Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
+                Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+            end
+        end
+        
+        function img = microscope_correct_image(Scp,img)
+            img = flip(img,2);
+        end
+
+%         function setZ(Scp,Z)
+%             try % Timeout error on hype scope where um misses task completely signal
+%                 Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
+%                 Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+%             catch % try again
+%                 disp('Error during stage movement. Trying again')
+%                 Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
+%                 Scp.mmc.waitForDevice(Scp.mmc.getProperty('Core','XYStage'));
+%             end
+%         end
     end
-    
-    
-    
 end

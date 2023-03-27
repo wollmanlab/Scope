@@ -15,17 +15,17 @@ classdef Notifications
 %             slack_users('Roy') = '@rwollman';
 %             slack_users('Timothy') = '@timothyliu04';
 %             save('notifications_handles.mat', 'slack_users');
-            
+%             
 %             slack_hooks = containers.Map;
-%             slack_hooks('NinjaScope') = 'https://hook*BREAK*s.slac*BREAK*k.com/services/T1GF*BREAK*B0T60/BEEP*BREAK*3EVUP/vI4n7XC5U*BREAK*NE5liMcIbG2J4E7';
-%             slack_hooks('HypeScope') = 'https://hoo*BREAK*ks.slack*BREAK*.com/services/T1GFB*BREAK*0T60/BFBLPT*BREAK*G6A/xPW2dUqct9u*BREAK*6NWmnCaIGgaEA';
-%             slack_hooks('RamboScope') = 'https://hoo*BREAK*ks.slac*BREAK*k.com/services/T1GFB0*BREAK*T60/B02GHEY*BREAK*PL21/Hf7VdmS9*BREAK*Sy1ck18exycEXnv6';
-%             slack_hooks('FutureScope1') = 'https://ho*BREAK*oks.sla*BREAK*ck.com/services/T1GFB*BREAK*0T60/B04TRS*BREAK*ZCXPS/vqvaKIga*BREAK*TEyaPGWgdeU7gQId';
-%             slack_hooks('FutureScope2') = 'https://hoo*BREAK*ks.sla*BREAK*ck.com/services/T1GFB*BREAK*0T60/B04TRT*BREAK*9RUSC/2HwCAVD*BREAK*Kwc0eLjH0cTGTk3Yx';
-%             slack_hooks('FutureScope3') = 'https://hoo*BREAK*ks.slac*BREAK*k.com/services/T1GF*BREAK*B0T60/B04T2*BREAK*7F6N1Y/8cYXxibD*BREAK*ESnkZdzoEqwDIrxK';
-%             slack_hooks('FutureScope4') = 'https://hoo*BREAK*ks.slac*BREAK*k.com/services/T1GF*BREAK*B0T60/B04SV*BREAK*K71K7G/4DBycce1*BREAK*Wh1qrPtjZ4oyvPFf';
-%             slack_hooks('FutureScope5') = 'https://hoo*BREAK*ks.slac*BREAK*k.com/services/T1GF*BREAK*B0T60/B04SMM*BREAK*FKB8F/71bNIh59*BREAK*2y2ay8snnSw8hL6j';
-%             slack_hooks('FutureScope6') = 'https://hoo*BREAK*ks.slac*BREAK*k.com/services/T1*BREAK*GFB0T60/B04T28B2*BREAK*H98/nMyNmhJJP*BREAK*CzPMSbUi8Oigiaq';
+%             slack_hooks('NinjaScope') = 'https://hooks.sla*BREAK*ck.com/services/T1GFB0*BREAK*T60/BEEP3EVUP/vI4n7XC5UNE*BREAK*5liMcIbG2J4E7';
+%             slack_hooks('HypeScope') = 'https://hooks.sla*BREAK*ck.com/services/T1GFB0T60/BFBLP*BREAK*TG6A/xPW2dUqct9u6N*BREAK*WmnCaIGgaEA';
+%             slack_hooks('RamboScope') = 'https://hooks.slac*BREAK*k.com/services/T1GFB0T60/B02GH*BREAK*EYPL21/Hf7VdmS9Sy1*BREAK*ck18exycEXnv6';
+%             slack_hooks('FutureScope1') = 'https://hooks.sl*BREAK*ack.com/services/T1GFB0T60/B04TR*BREAK*SZCXPS/vqvaKIgaTE*BREAK*yaPGWgdeU7gQId';
+%             slack_hooks('FutureScope2') = 'https://hooks.sl*BREAK*ack.com/services/T1GFB0T60/B04TR*BREAK*T9RUSC/2HwCAVDKwc0*BREAK*eLjH0cTGTk3Yx';
+%             slack_hooks('FutureScope3') = 'https://hooks.sl*BREAK*ack.com/services/T1GFB0T60/B04T27*BREAK*F6N1Y/8cYXxibDESn*BREAK*kZdzoEqwDIrxK';
+%             slack_hooks('FutureScope4') = 'https://hooks.sla*BREAK*ck.com/services/T1GFB0T60/B04SVK*BREAK*71K7G/4DBycce1Wh1*BREAK*qrPtjZ4oyvPFf';
+%             slack_hooks('FutureScope5') = 'https://hooks.sla*BREAK*ck.com/services/T1GFB0T60/B04SMM*BREAK*FKB8F/71bNIh592y2*BREAK*ay8snnSw8hL6j';
+%             slack_hooks('FutureScope6') = 'https://hooks.sl*BREAK*ack.com/services/T1GFB0T60/B04T28*BREAK*B2H98/nMyNmhJJPCz*BREAK*PMSbUi8Oigiaq';
 %             save('notifications_addresses.mat', 'slack_hooks');
             
             if isKey(slack_users,Scp.Username)
@@ -50,8 +50,10 @@ classdef Notifications
 
             labels = Scp.Pos.Labels(Scp.Pos.Hidden==0);
             label = labels{1};
-            label = strsplit(label,'-');
+            label = strsplit(label,'_');
             Well = label{1};
+            Well = strsplit(Well,'-');
+            Well = Well{1};
             message = [Scp.Dataset,' ',message,' ',Well];
 
             [user,hook] = A.populateSlackAddresses(Scp);

@@ -28,18 +28,20 @@ preview_acqdata(1).Delay = 10; %
 %% Setup Fluidics Parameters
 Scp.FlowData.Rounds = [1:25];
 Scp.FlowData.FlowGroups = {'ABC'};
+Scp.FlowData.update_FlowData();
 Scp.FlowData.Tasks
 %% Acquire All Wells First Find Focus manually First
 Scp.Chamber = Plate('Underwood6');
-position_acq_names = cell(n_coverslips,1);
+position_acq_names = cell(Scp.FlowData.n_coverslips,1);
 
 Scp.AutoFocusType='none';
 for c=1:FlowData.n_coverslips
-    coverslip = FlowData.coverslips{c};
+    coverslip = Scp.FlowData.coverslips{c};
     Wells = {coverslip};
     Scp.createPositions('spacing',0.9, ...
         'sitesshape','circle', ...
         'wells',Wells,'optimize',true)
+    Scp.Pos.Well = coverslip;
     Scp.acquire(preview_acqdata);
     position_acq_names{c} = Scp.getLastAcqname;
     Scp.Pos.save;

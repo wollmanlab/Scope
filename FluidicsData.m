@@ -35,11 +35,11 @@ classdef FluidicsData < handle
         end
 
         function start_Gui(FlowData)
-            system([FlowData.python,' ',FlowData.gui,'-f ',FlowData.device,' &'])
+            system([FlowData.python,' ',FlowData.gui,' -f ',FlowData.device,' &'])
         end
 
         function start_Fluidics(FlowData)
-            system([FlowData.python,' ',FlowData.fluidics,'-f ',FlowData.device,' &'])
+            system([FlowData.python,' ',FlowData.fluidics,' -f ',FlowData.device,' &'])
         end
 
         function command = build_command(FlowData,protocol,wells,other)
@@ -57,6 +57,9 @@ classdef FluidicsData < handle
             command = FlowData.build_command(FlowData.protocol,FlowData.wells,FlowData.other);
             if ~isempty(FlowData.wells)
                 FlowData.send_command(command,Scp)
+            else
+                % Assumes 2 groups max
+                FlowData.wait_until_available()
             end
         end
 
