@@ -49,11 +49,15 @@ classdef Notifications
             arg = parseVarargin(varargin,arg);
 
             labels = Scp.Pos.Labels(Scp.Pos.Hidden==0);
-            label = labels{1};
-            label = strsplit(label,'_');
-            Well = label{1};
-            Well = strsplit(Well,'-');
-            Well = Well{1};
+            if isempty(labels)
+                Well = 'Empty Positions';
+            else
+                label = labels{1};
+                label = strsplit(label,'_');
+                Well = label{1};
+                Well = strsplit(Well,'-');
+                Well = Well{1};
+            end
             message = [Scp.Dataset,' ',message,' ',Well];
 
             [user,hook] = A.populateSlackAddresses(Scp);

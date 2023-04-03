@@ -1946,7 +1946,7 @@ classdef (Abstract) Scope < handle
              hidden(X>Scp.X_stage_max_limit) = 1;
              hidden(X<Scp.X_stage_min_limit) = 1;
              hidden(Y>Scp.Y_stage_max_limit) = 1;
-             hidden(Y<-Scp.Y_stage_min_limit) = 1;
+             hidden(Y<Scp.Y_stage_min_limit) = 1;
              Pos.Hidden = hidden;
 
         end

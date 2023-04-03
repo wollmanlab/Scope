@@ -19,7 +19,7 @@ classdef (Abstract) AutoFocus < handle
             save(['C:\Users\wollmanlab\AF_',AF.Well,'.mat'], 'AF');
         end
 
-        function load(AF,Well)
+        function AF = load(AF,Well)
             AF = load(['C:\Users\wollmanlab\AF_',Well,'.mat']);
             AF = AF.AF;
         end

@@ -18,6 +18,7 @@ classdef NinjaScope < Scope
         
         function Scp = NinjaScope()
             Scp@Scope();
+            Scp.FlowData.device = 'NinjaFluidics';
             Scp.dXY = [Scp.X_offset Scp.Y_offset];
             %addpath('C:\Fiji.app\scripts')
             %addpath('C:\Program Files\Micro-Manager-2.0gamma')
@@ -54,6 +55,10 @@ classdef NinjaScope < Scope
             %Scp.loadFlatFields;
             %Scp.CorrectFlatField = false;
             Scp.mmc.setProperty(Scp.DeviceNames.LightPath{1},Scp.DeviceNames.LightPath{2},Scp.DeviceNames.LightPath{4});
+            Scp.Zpercision = 0.5;
+            Scp.reduceAllOverheadForSpeed = 1;
+            Scp.AutoFocusType='none';
+            Scp.acqshow = 'single';
             Miji;
         end
         

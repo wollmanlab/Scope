@@ -22,8 +22,11 @@ classdef FluidicsData < handle
         coverslips;
         all_wells;
         wells;
+        image_wells;
         protocol;
+        image_protocol;
         other;
+        image_other;
         hybe;
         AcqData;
 
@@ -63,14 +66,22 @@ classdef FluidicsData < handle
             end
         end
 
+        function image_wells = get.image_wells(FlowData)
+            image_wells = FlowData.Tasks{FlowData.current_idx,6};
+        end
+        function image_protocol = get.image_protocol(FlowData)
+            image_protocol = FlowData.Tasks{FlowData.current_idx,5};
+        end
+        function image_other = get.image_other(FlowData)
+            image_other = FlowData.Tasks{FlowData.current_idx,4};
+        end
+
         function wells = get.wells(FlowData)
             wells = FlowData.Tasks{FlowData.current_idx,3};
         end
-
         function protocol = get.protocol(FlowData)
             protocol = FlowData.Tasks{FlowData.current_idx,2};
         end
-
         function other = get.other(FlowData)
             other = FlowData.Tasks{FlowData.current_idx,1};
         end

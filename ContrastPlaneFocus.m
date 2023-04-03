@@ -227,7 +227,6 @@ classdef ContrastPlaneFocus < NucleiFocus
                 AF.Pos.axis = {'X','Y','Z'};
             end
             AF.Pos.List = global_XYZ;
-            AF.save_AF;
         end
 
 

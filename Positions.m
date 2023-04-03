@@ -36,7 +36,7 @@ classdef Positions < handle
             save(['C:\Users\wollmanlab\Pos_',Pos.Well,'.mat'], 'Pos');
         end
 
-        function load(Pos,Well)
+        function Pos = load(Pos,Well)
             Pos = load(['C:\Users\wollmanlab\Pos_',Well,'.mat']);
             Pos = Pos.Pos;
         end
