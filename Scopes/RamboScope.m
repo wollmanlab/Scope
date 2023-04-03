@@ -5,7 +5,7 @@ classdef RamboScope < Scope
     properties
         AF = TheseusFocus; 
         Notifications = Notifications;
-        TempHumiditySensor = DHT11('COM14'); %FIX
+        TempHumiditySensor = DHT11('COM15'); %FIX
         FlowData = FluidicsData;
         X_stage_max_limit = 110000;
         X_stage_min_limit = 0;
