@@ -7,7 +7,7 @@ Scp = RamboScope;
 Scp.Username = 'Zach'; % your username!
 Scp.Project = 'Test'; % the project this dataset correspond to
 Scp.Dataset = 'TBI'; % the name of this specific image dataset - i.e. this experiment.
-Scp.ExperimentDescription = [''];
+Scp.ExperimentDescription = ['500 ug TBI Probes/brain'];
 
 %% Setup Imaging Parameters
 % For Data Collection
@@ -42,12 +42,12 @@ Scp.AutoFocusType='none';
 for c=1: Scp.FlowData.n_coverslips
     coverslip = Scp.FlowData.coverslips{c};
     Wells = {coverslip};
-    % Plate
+    % Plate only if sample is in center
     Scp.createPositions('spacing',1, ...
         'sitesperwell',[30,30], ...
         'sitesshape','grid', ...
         'wells',Wells,'optimize',true)
-    % MM
+    % MM if sample is not in center
 %     Scp.createPositionFromMM()
     Scp.Pos.Well = coverslip;
     Scp.acquire(preview_acqdata);
@@ -57,7 +57,8 @@ end
 %% Filter Positions by draw
 for c=1:Scp.FlowData.n_coverslips
     coverslip = Scp.FlowData.coverslips{c};
-    Scp.Pos.load([coverslip])
+    Scp.Pos = Scp.Pos.load([coverslip]);
+    Wells = {coverslip};
     Scp.createPositions('spacing',1, ...
         'sitesperwell',[30,30], ...
         'sitesshape','grid', ...
@@ -69,9 +70,9 @@ end
 %% Setup AutoFocus and check Focus
 for c=1:Scp.FlowData.n_coverslips
     coverslip = Scp.FlowData.coverslips{c};
-    Scp.Pos.load([coverslip])
+    Scp.Pos = Scp.Pos.load([coverslip]);
     Scp.AF = ContrastPlaneFocus;
-    Scp.AF.channel = 'DeepBlue';%'AutoFocus';
+    Scp.AF.channel = 'AutoFocus';%'AutoFocus';
     Scp.AF.exposure = 10;
     Scp.AF.coarse_window = 50;
     Scp.AF.coarse_dZ = 5;
@@ -112,8 +113,8 @@ for i=2:size(Scp.FlowData.Tasks,1)
     % IMAGE
     for c = 1:length(Scp.FlowData.wells)
         coverslip = Scp.FlowData.coverslips(c);
-        Scp.Pos.load([coverslip])
-        Scp.AF.load([coverslip])
+        Scp.Pos = Scp.Pos.load([coverslip]);
+        Scp.AF = Scp.AF.load([coverslip]);
         % Update AutoFocus
         Scp.AF = Scp.AF.updateZ(Scp);
         % Image
