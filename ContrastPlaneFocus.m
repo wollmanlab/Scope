@@ -43,10 +43,18 @@ classdef ContrastPlaneFocus < NucleiFocus
             AF.Pos.Well = Pos.Well;
             good_labels = 1:length(AF.Pos.Labels);
             if arg.filter
-                if floor(length(good_labels)*arg.percentage)>AF.n_neighbors
+                if floor(length(good_labels)*(1-arg.percentage))>AF.n_neighbors
                     filtered_labels = datasample(good_labels,floor(length(good_labels)*arg.percentage),'Replace',false);
                 else
-                    filtered_labels = datasample(good_labels,AF.n_neighbors,'Replace',false);
+                    if length(good_labels)>AF.n_neighbors
+                        filtered_labels = datasample(good_labels,length(good_labels)-AF.n_neighbors,'Replace',false);
+                    elseif length(good_labels)<3
+                        Scp.Notifications.sendSlackMessage(Scp,['Not Enough Positions for Plane Use NucleiFocus']);
+                        uiwait(msgbox(['You should probably just use NucleiFocus']))
+                    else
+                        AF.n_neighbors = length(good_labels);
+                        filtered_labels = [];
+                    end
                 end
                 AF.Pos.Hidden(filtered_labels) = 1;
             end
