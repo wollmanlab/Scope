@@ -64,7 +64,7 @@ for c=1:Scp.FlowData.n_coverslips
         'sitesshape','grid', ...
         'wells',Wells,'optimize',true)
     Scp.Pos.Well = coverslip;
-    Scp.filterPositionsByDraw('acq_name',position_acq_names{c},'acqdata',Scp.FlowData.AcqData)
+    Scp.filterPositionsByDraw('acq_name',position_acq_names{c},'acqdata',preview_acqdata)
     Scp.Pos.save
 end
 %% Setup AutoFocus and check Focus
