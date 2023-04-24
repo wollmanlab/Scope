@@ -8,12 +8,12 @@ classdef Notifications
             slack_users = load('notifications_handles.mat');
             slack_users = slack_users.slack_users;
 %             slack_users = containers.Map;
-%             slack_users('Zach') = '@zehemminger';
-%             slack_users('Gaby') = '@gsanc011';
-%             slack_users('Thomas') = '@tomunderwood';
-%             slack_users('Haley') = '@haleydeocampo';
-%             slack_users('Roy') = '@rwollman';
-%             slack_users('Timothy') = '@timothyliu04';
+            slack_users('Zach') = '@zehemminger';
+            slack_users('Gaby') = '@gsanc011';
+            slack_users('Thomas') = '@tomunderwood';
+            slack_users('Haley') = '@hdeocampo';
+            slack_users('Roy') = '@rwollman';
+            slack_users('Timothy') = '@timothyliu04';
 %             save('notifications_handles.mat', 'slack_users');
 %             
 %             slack_hooks = containers.Map;
