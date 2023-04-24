@@ -1,10 +1,5 @@
 classdef FluidicsData < handle
-
-    %%
-    % FlowData = Copy_of_FluidicsData
-    % FlowData.start_Gui
-    % FlowData.send_command(FlowData.build_command('Valve',['A','B','C'],'TBS+3'),Scp)
-    %%
+     %FlowData.send_command(FlowData.build_command('Valve',['A','B','C'],'TBS+3'),Scp)
     properties
         device = 'Fluidics'
         available = false;
@@ -92,7 +87,8 @@ classdef FluidicsData < handle
         end
 
         function available = get.available(FlowData)
-            message = fileread(FlowData.log);
+            log = ['C:/GitRepos/Fluidics/',FlowData.device,'_Status.txt'];
+            message = fileread(log);
             if contains(message,'Finished')
                 available = true;
             elseif contains(message,'Available')
@@ -103,8 +99,9 @@ classdef FluidicsData < handle
         end
 
         function writelog(FlowData,message)
+            log = ['C:/GitRepos/Fluidics/',FlowData.device,'_Status.txt'];
             disp('Sending Command')
-            fileID = fopen(FlowData.log,'w');
+            fileID = fopen(log,'w');
             fprintf(fileID,message);
             fclose(fileID);
         end
