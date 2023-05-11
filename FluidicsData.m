@@ -155,9 +155,9 @@ classdef FluidicsData < handle
                 end
             end
             FlowData.all_wells = [FlowData.FlowGroups{1:end}];
-            FlowData.coverslips = cell(length(FlowData.wells),1);
-            for i=1:length(FlowData.wells)
-                FlowData.coverslips{i} = FlowData.wells(i);
+            FlowData.coverslips = cell(length(FlowData.all_wells),1);
+            for i=1:length(FlowData.all_wells)
+                FlowData.coverslips{i} = FlowData.all_wells(i);
             end
             FlowData.n_coverslips = size(FlowData.coverslips,1);
         end
