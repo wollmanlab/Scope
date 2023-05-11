@@ -6,7 +6,7 @@ Scp = NinjaScope;
 %% Set up: username, project name and dataset
 Scp.Username = 'Gaby'; % your username!
 Scp.Project = 'dredFISH'; % the project this dataset correspond to
-Scp.Dataset = '100uL.A_500uL.B'; % the name of this specific image dataset - i.e. this experiment.
+Scp.Dataset = 'treeDPNMF_V2_.C'; % the name of this specific image dataset - i.e. this experiment.
 Scp.ExperimentDescription = ['500 ug DPNMF Probes/brain'];
 %% Setup Imaging Parameters
 % For Data Collection
@@ -29,7 +29,7 @@ Scp.FlowData.start_Fluidics()
 
 %% Setup Fluidics Parameters
 Scp.FlowData.Rounds = [1:25];
-Scp.FlowData.FlowGroups = {'AB'};
+Scp.FlowData.FlowGroups = {'C'};
 Scp.FlowData.update_FlowData();
 Scp.FlowData.Tasks
 %% Acquire All Wells First Find Focus manually First
