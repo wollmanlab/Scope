@@ -246,10 +246,10 @@ previous_channel = Scp.Channel;
 previous_exposure = Scp.Exposure;
 Scp.Channel = AF.channel;
 Scp.Exposure = AF.exposure;
-% Set Auto Shutter Off
-Scp.mmc.setAutoShutter(0);
-% Open Shutter (Auto Shutter must be off)
-Scp.mmc.setShutterOpen(1);
+% % Set Auto Shutter Off
+% Scp.mmc.setAutoShutter(0);
+% % Open Shutter (Auto Shutter must be off)
+% Scp.mmc.setShutterOpen(1);
             % Calculate Focus Score
             for zindex = 1:length(steps)
                 z = steps(zindex);
@@ -260,13 +260,15 @@ Scp.mmc.setShutterOpen(1);
             Zfocus = mean(steps(score==max(score)));
             Scp.Z = Zfocus;
             img = Scp.snapImage;
-            % Set Auto Shutter On
-Scp.mmc.setAutoShutter(1);
-% Open Shutter (Auto Shutter must be off)
-Scp.mmc.setShutterOpen(0);
+
+%             % Set Auto Shutter On
+% Scp.mmc.setAutoShutter(1);
+% % Open Shutter (Auto Shutter must be off)
+% Scp.mmc.setShutterOpen(0);
 %             % Turn off Light
 %             Scp.mmc.stopSequenceAcquisition()
 %             Scp.ContinousImaging = false;
+% figure(707)
 %             scatter(steps,score)
             Scp.Channel =  previous_channel;
             Scp.Exposure = previous_exposure;
@@ -279,11 +281,19 @@ Scp.mmc.setShutterOpen(0);
 %             Scp.Channel=AF.channel;
 %             Scp.Exposure=AF.exposure;
             % False will acq a Z stack per color.
+            % Set Auto Shutter Off
+            Scp.mmc.setAutoShutter(0);
+            % Open Shutter (Auto Shutter must be off)
+            Scp.mmc.setShutterOpen(1);
+            pause(0.01);
             if AF.resize~=1
                 img=imresize(Scp.snapImage, AF.resize);
             else
                 img = Scp.snapImage;
             end
+            Scp.mmc.setAutoShutter(1);
+            % Open Shutter (Auto Shutter must be off)
+            Scp.mmc.setShutterOpen(0);
             % calculate metric
             switch lower(AF.metric)
                 case 'sobel'
