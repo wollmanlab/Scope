@@ -37,6 +37,10 @@ classdef Notifications
             slack_hooks = load('notifications_addresses.mat');
             slack_hooks = slack_hooks.slack_hooks;
 
+            slack_hooks('OrangeScope') = slack_hooks('NinjaScope');
+            slack_hooks('BlueScope') = slack_hooks('RamboScope');
+            slack_hooks('PurpleScope') = slack_hooks('HypeScope');
+
             if isKey(slack_hooks,class(Scp))
                 hook = slack_hooks(class(Scp));
             else
