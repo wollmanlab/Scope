@@ -24,8 +24,8 @@ preview_acqdata(1).Exposure = 5; %
 preview_acqdata(1).Delay = 10; %
 
 %%
-%Scp.FlowData.start_Gui()
-%Scp.FlowData.start_Fluidics()
+Scp.FlowData.start_Gui()
+Scp.FlowData.start_Fluidics()
 
 %% Setup Fluidics Parameters
 Scp.FlowData.Rounds = [25];
