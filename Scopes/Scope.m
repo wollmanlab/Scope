@@ -2100,31 +2100,45 @@ classdef (Abstract) Scope < handle
                         img=timg.pix;
                     catch
                         Scp.mmc.clearCircularBuffer()
-                        pause(1);
-                        command = 'Alert : Camera Failed to Snap Image';
+                        command = 'Servere Alert : Camera Did Not Recover. I Need Help!';
                         Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command]);
-                        try
+                        y = 'y';
+                        n = 'n';
+                        c = input("continue? (y/n))");
+                        if c=='y'
                             Scp.mmc.snapImage;
                             timg=Scp.mmc.getTaggedImage;
                             img=timg.pix;
-                            command = 'Camera Recovered';
-                            Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command]);
-                        catch
-                            Scp.mmc.clearCircularBuffer()
-                            command = 'Servere Alert : Camera Did Not Recover. I Need Help!';
-                            Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command]);
-                            y = 'y';
-                            n = 'n';
-                            c = input("continue? (y/n))");
-                            if c=='y'
-                                Scp.mmc.snapImage;
-                                timg=Scp.mmc.getTaggedImage;
-                                img=timg.pix;
-                            elseif c=='n'
-                                error = out;
-                            end
-%                             img = zeros(Scp.Width * Scp.Height,1);
+                        elseif c=='n'
+                            error = out;
                         end
+% 
+%                         Scp.mmc.clearCircularBuffer()
+%                         pause(1);
+%                         command = 'Alert : Camera Failed to Snap Image';
+%                         Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command]);
+%                         try
+%                             Scp.mmc.snapImage;
+%                             timg=Scp.mmc.getTaggedImage;
+%                             img=timg.pix;
+%                             command = 'Camera Recovered';
+%                             Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command]);
+%                         catch
+%                             Scp.mmc.clearCircularBuffer()
+%                             command = 'Servere Alert : Camera Did Not Recover. I Need Help!';
+%                             Scp.Notifications.sendSlackMessage(Scp,[Scp.Dataset,' ',command]);
+%                             y = 'y';
+%                             n = 'n';
+%                             c = input("continue? (y/n))");
+%                             if c=='y'
+%                                 Scp.mmc.snapImage;
+%                                 timg=Scp.mmc.getTaggedImage;
+%                                 img=timg.pix;
+%                             elseif c=='n'
+%                                 error = out;
+%                             end
+% %                             img = zeros(Scp.Width * Scp.Height,1);
+%                         end
                     end
                 else
                     Scp.mmc.snapImage;
@@ -2479,16 +2493,17 @@ classdef (Abstract) Scope < handle
             try
                 for attempt=1:max_attempts
                     if attempt>1
-                        pause(attempt)
-                        Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z-2)
-                        if attempt>2
+                        pause(0.2+abs(Z-currZ)/10)
+                        Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
+                        if attempt>3
+                            Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
                             message = ['Stage is not able to get to this position (Z) Attempt #',int2str(attempt)];
                             Scp.Notifications.sendSlackMessage(Scp,message);
                         end
                     end
-                    Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
                     if attempt==1
-                        pause(0.2+abs(Z-currZ)/100)
+                        Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
+                        pause(0.2+abs(Z-currZ)/50)
                     end
                     if Scp.checkZStage(Z)
                         break
