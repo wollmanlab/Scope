@@ -43,7 +43,11 @@ classdef FluidicsData < handle
         function command = build_command(FlowData,protocol,wells,other)
             chambers = ['[',repmat(',', [1, (2*size(wells,2))-1]),']'];
             chambers(2*(1:size(wells,2))) = wells(1:size(wells,2));
-            command = [protocol,'*',chambers,'*',other];
+            if strcmp(FlowData.extras,'')
+                command = [protocol,'*',chambers,'*',other];
+            else
+                command = [protocol,'*',chambers,'*',other,'+',FlowData.extras];
+            end
         end
 
         function fill_wells_TBS(FlowData,Scp)
