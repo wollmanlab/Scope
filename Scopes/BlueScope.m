@@ -5,7 +5,7 @@ classdef BlueScope < Scope
     properties
         AF = TheseusFocus; 
         Notifications = Notifications;
-        TempHumiditySensor = DHT11('COM15'); %FIX
+        TempHumiditySensor = DHT11('COM14'); %FIX
         FlowData = FluidicsData;
         X_stage_max_limit = 110000;
         X_stage_min_limit = 0;
@@ -51,6 +51,13 @@ classdef BlueScope < Scope
             Miji;
             %%% java.lang.System.gc()
             
+        end
+
+        function PixelSize = getPixelSize(Scp)
+            PixelSize = 0.08;%Scp.mmc.getPixelSizeUm;
+%             if Scp.Optovar==1
+%                 PixelSize = PixelSize/0.7;
+%             end
         end
         
         function [z,s] = autofocus(Scp)
