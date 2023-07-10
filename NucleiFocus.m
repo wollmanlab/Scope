@@ -303,7 +303,7 @@ Scp.Exposure = AF.exposure;
                     gy=imfilter(img,hy);
                     metric=mean(hypot(gx(:),gy(:)));
                 case 'sobel_af'
-                    img = img(1000:end,:);
+                    %img = img(1000:end,:);
                     img = imgaussfilt(img,AF.smooth);
                     bkg = imgaussfilt(img,AF.smooth*10);
                     img = img-bkg;
