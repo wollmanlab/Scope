@@ -15,6 +15,14 @@ classdef DHT11
             end
         end
 
+        function checkSerial(Sensor)
+            try
+                Sensor.serial = serialport(Sensor.comPort,9600);
+                configureTerminator(Sensor.serial,"CR/LF");
+            catch
+            end
+        end
+
         function temp = getTemp(Sensor)
             Sensor = Sensor.updateStatus();
             temp = Sensor.temp;
@@ -26,6 +34,8 @@ classdef DHT11
         end
 
         function Sensor = updateStatus(Sensor)
+            Sensor.checkSerial();
+            try
             flush(Sensor.serial);
             not_completed = true;
             iter = 0;
@@ -44,6 +54,10 @@ classdef DHT11
                     end
                     iter = iter+1;
             end
+            catch
+                Sensor.temp = 0;
+                Sensor.humidity = 0;
+             end
         end
 
     end
