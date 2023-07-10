@@ -6,6 +6,7 @@ classdef FluidicsData < handle
         log = 'C:/GitRepos/Fluidics/Status.txt';
         Rounds = [1:25];
         Protocols = {'Strip','Hybe'};
+        ImageProtocols = {'Strip','Hybe'};
         FlowGroups = {'ABC','DEF'};
         Tasks
         current_idx = 1;
@@ -149,13 +150,19 @@ classdef FluidicsData < handle
             % 1-3 are flow commands % 4-6 are image commands
             if length(FlowData.FlowGroups)>1
                 FlowData.Tasks = cell(size(Steps,1)+1,6);
-                FlowData.Tasks(1:size(Steps,1),1:3) = Steps;
-                FlowData.Tasks(2:(size(Steps,1)+1),4:6) = Steps;
+                for task=1:size(Steps,1)
+                    FlowData.Tasks(task,1:3) = Steps(task,:);
+                    if any(strcmp(Steps(task,2),FlowData.ImageProtocols))
+                        FlowData.Tasks(task+1,4:6) = Steps(task,:);
+                    end
+                end
             else
                 FlowData.Tasks = cell(2*size(Steps,1)+1,6);
-                for i=1:size(Steps,1)
-                    FlowData.Tasks(2*i,4:6) = Steps(i,:);
-                    FlowData.Tasks((2*i)-1,1:3) = Steps(i,:);
+                for task=1:size(Steps,1)
+                    FlowData.Tasks(2*task-1,1:3) = Steps(task,:);
+                    if any(strcmp(Steps(task,2),FlowData.ImageProtocols))
+                        FlowData.Tasks(2*task,4:6) = Steps(task,:);
+                    end
                 end
             end
             FlowData.all_wells = [FlowData.FlowGroups{1:end}];
