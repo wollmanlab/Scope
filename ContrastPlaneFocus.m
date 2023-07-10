@@ -223,7 +223,7 @@ classdef ContrastPlaneFocus < NucleiFocus
                 for i=1:n_pos
                     Scp.XY = XYZ(i,1:2);
                     Scp.Z = XYZ(i,3);
-                    XYZ(i,3) = AF.SecondaryImageBasedScan(Scp);
+                    XYZ(i,3) = AF.PrimaryImageBasedScan(Scp);
                 end
                 translation = median(global_XYZ(selected_labels,3)-XYZ(:,3));
                 global_XYZ(m,3) = global_XYZ(m,3)-translation;
