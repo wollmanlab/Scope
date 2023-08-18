@@ -80,7 +80,11 @@ classdef Notifications
                 status = SendSlackNotification(hook,message,user);
                 if strcmp(status,'ok')==0
                     message = [message,newline,Scp.Username,newline,' Notification Class Slack Handle not correct'];
-                    status = SendSlackNotification(hook,message);
+                    try
+                        status = SendSlackNotification(hook,message);
+                    catch
+                        disp('Slack Message Not Sent')
+                    end
                     if strcmp(status,'ok')==0
                         msgbox([message,newline,'Slack Hook not set up correctly'])
                     end
