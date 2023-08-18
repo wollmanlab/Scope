@@ -36,7 +36,7 @@ classdef (Abstract) Scope < handle
 
         %% Acquisition information
         SkipCounter = 0; % this is for Position skipping
-        Pos
+        Pos = Positions;
         Tpnts
         AllMDs = [];
         MD = []; % current MD (this is a pointer, a copy of which will be in AllMDs as well!
@@ -2493,17 +2493,17 @@ classdef (Abstract) Scope < handle
             try
                 for attempt=1:max_attempts
                     if attempt>1
-                        pause(0.2+abs(Z-currZ)/10)
+                        pause(attempt)
                         Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
-                        if attempt>3
-                            Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
-                            message = ['Stage is not able to get to this position (Z) Attempt #',int2str(attempt)];
-                            Scp.Notifications.sendSlackMessage(Scp,message);
-                        end
+%                         if attempt>3
+%                             Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
+%                             message = ['Stage is not able to get to this position (Z) Attempt #',int2str(attempt)];
+%                             Scp.Notifications.sendSlackMessage(Scp,message);
+%                         end
                     end
                     if attempt==1
                         Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
-                        pause(0.2+abs(Z-currZ)/50)
+                        pause(min([0.1+abs(Z-currZ)/10,2]))
                     end
                     if Scp.checkZStage(Z)
                         break
