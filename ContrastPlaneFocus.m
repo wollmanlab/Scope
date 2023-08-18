@@ -126,6 +126,7 @@ classdef ContrastPlaneFocus < NucleiFocus
                 Scp.XY = mean(XYZ(:,1:2));
                 % Use Slow Wide Scan For primary search
                 section_focus = AF.PrimaryImageBasedScan(Scp);
+                section_focus = Scp.Z;
                 AF.group_focuses(G) = section_focus;
                 global_XYZ(m,3) = section_focus;
                 % Create 3x3 grid of positions for reference
