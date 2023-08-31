@@ -1,6 +1,6 @@
 classdef Notifications
     properties
-        
+        all=true;
     end
     
     methods
@@ -52,9 +52,13 @@ classdef Notifications
             arg.all = false;
             arg = parseVarargin(varargin,arg);
 
+            if (~arg.all)&(A.all)
+                A.sendSlackMessage(Scp,message,'all',true);
+            end
+
             labels = Scp.Pos.Labels(Scp.Pos.Hidden==0);
             if isempty(labels)
-                Well = 'Empty Positions';
+                Well = '';
             else
                 label = labels{1};
                 label = strsplit(label,'_');
