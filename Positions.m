@@ -4,6 +4,7 @@ classdef Positions < handle
         List = []; % of size Nx2 (or 3 if Z matters) 
         Labels = {}; % of size Nx1 names of 
         Group = {}; % if size Nx1, a grouping variables for positions 
+        Other = {}; % of size Nx1 for storing extra info for each position
         Hidden;
         % for example could be used for multi-wells a way to know which
         % positions belong to which group
