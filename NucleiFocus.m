@@ -14,12 +14,13 @@ classdef NucleiFocus < AutoFocus
         resize=1;
         thresh = 1*10^-3;
         iteration = 1;
+        n_iterations = 20;
         max_iterations = 3;
         distance_thresh = 5000;
         metric='sobel_af';
         ticker = 0;
         check_frequency = 0;
-
+        last_best_metric_score = 0;
         coarse_window = 200;
         coarse_dZ = 20;
         medium_window = 20;
@@ -229,13 +230,40 @@ classdef NucleiFocus < AutoFocus
             toc
         end
 
+        function Zfocus = MiddleOutScan(AF,Scp)
+            tic
+            startZ = Scp.Z;
+            currZ = startZ;
+            % Middle Out
+            for i=1:AF.n_iterations
+                Zfocus = ImageBasedScan(AF,Scp, AF.fine_dZ*i, AF.fine_dZ*i);
+                if abs(Zfocus-currZ)<AF.fine_dZ
+                    break
+                end
+                currZ = Zfocus;
+            end
+            if i==AF.n_iterations
+                disp('Focus Not Found By Middle Out Scan')
+
+                % Focus not found 
+                Scp.Z = startZ;
+                Zfocus = AF.PrimaryImageBasedScan(Scp);
+            else
+                % Out In
+                for j=i:1
+                    Zfocus = ImageBasedScan(AF,Scp, AF.fine_dZ*j, AF.fine_dZ*j);
+                end
+            end
+            toc
+        end
+
 
         function Zfocus = ImageBasedScan(AF,Scp,window,dZ)
 %             AF.smooth = dZ;
             zinit = Scp.Z;
             zmax = zinit + window;
             zmin = zinit - window;
-            steps = linspace(zmin,zmax,round((zmax-zmin)/dZ));
+            steps = linspace(zmin,zmax,1+round((zmax-zmin)/dZ));
             score = zeros(length(steps),1);
 
 %             % Turn on Light
@@ -260,6 +288,8 @@ Scp.Exposure = AF.exposure;
             Zfocus = mean(steps(score==max(score)));
             Scp.Z = Zfocus;
             img = Scp.snapImage;
+            disp(score')
+            disp(steps)
 
 %             % Set Auto Shutter On
 % Scp.mmc.setAutoShutter(1);
@@ -276,7 +306,15 @@ Scp.Exposure = AF.exposure;
 
         end
 
-        function metric = calcMetric(AF,Scp)
+        function metric = calcMetric(AF,Scp,varargin)
+            arg.update_scp = false;
+            arg = parseVarargin(varargin,arg);
+            if arg.update_scp
+                previous_channel = Scp.Channel;
+                previous_exposure = Scp.Exposure;
+                Scp.Channel = AF.channel;
+                Scp.Exposure = AF.exposure;
+            end
             % snap an image
 %             Scp.Channel=AF.channel;
 %             Scp.Exposure=AF.exposure;
@@ -329,6 +367,10 @@ Scp.Exposure = AF.exposure;
                     end
                     rng=prctile(m(:),[1 99]);
                     metric=rng(2)-rng(1);
+            end
+            if arg.update_scp
+                Scp.Channel =  previous_channel;
+                Scp.Exposure = previous_exposure;
             end
         end
 
