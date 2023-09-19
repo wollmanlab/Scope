@@ -3,7 +3,7 @@ classdef OrangeScope < Scope
     properties
        OptovarStatus=[];
        Notifications = Notifications;
-       AF = PerfectFocus;
+       AF = ContrastPlaneFocus;
        TempHumiditySensor = DHT11('COM9');
        FlowData = FluidicsData;
        X_stage_max_limit = 55000;
