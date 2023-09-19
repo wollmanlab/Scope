@@ -288,8 +288,8 @@ Scp.Exposure = AF.exposure;
             Zfocus = mean(steps(score==max(score)));
             Scp.Z = Zfocus;
             img = Scp.snapImage;
-            disp(score')
-            disp(steps)
+%             disp(score')
+%             disp(steps)
 
 %             % Set Auto Shutter On
 % Scp.mmc.setAutoShutter(1);
