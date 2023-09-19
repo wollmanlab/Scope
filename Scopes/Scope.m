@@ -20,7 +20,7 @@ classdef (Abstract) Scope < handle
 
         %% imaging properties
         Binning=1;
-
+        preview_binning = 5;
         Objective
         ObjectiveOffsets
         CameraAngle = 0;
@@ -285,6 +285,9 @@ classdef (Abstract) Scope < handle
 
 
             % look over all channel
+            height = ceil(Scp.Height/Scp.preview_binning);
+            width = ceil(Scp.Width/Scp.preview_binning);
+            stk = zeros([height,width,n]);
             for i=1:n
 %                 Scp.Channel = AcqData(n).Channel;
 %                 Scp.Exposure = AcqData(n).Exposure;
@@ -382,6 +385,7 @@ classdef (Abstract) Scope < handle
                     end
                     try
                         img = Scp.microscope_correct_image(img);
+                        stk(:,:,i)=imresize(img,[height,width]);
                         imwrite(uint16(img*2^16-1),fullfile(Scp.pth,acqname,filename));%AOY added -1
                     catch  %#ok<CTCH>
                         errordlg('Cannot save image to harddeive. Check out space on drive');
@@ -444,6 +448,12 @@ classdef (Abstract) Scope < handle
                 end
                 Scp.TimeStamp='metadata'; % to save within scope timestamps
             end
+            % add imaage to Pos for preview
+            pos_index = find(cellfun(@(x) strcmp(x, Scp.Pos.peek), Scp.Pos.Labels));
+            if size(Scp.Pos.Other{pos_index},1)==0
+                Scp.Pos.Other{pos_index} = stk;
+            end
+
             T(skipped)=[];
             ix(skipped)=[];
 
@@ -699,7 +709,10 @@ classdef (Abstract) Scope < handle
             %arg.delay = false;
             arg = parseVarargin(varargin,arg);
 
-
+            
+            if arg.viewstitched
+                Scp.Pos.Other = cell(Scp.Pos.N,1);
+            end
             %% Init Acq
             if isempty(arg.acqname)
                 acqname = Scp.initAcq(AcqData,arg);
@@ -786,7 +799,7 @@ classdef (Abstract) Scope < handle
             if arg.viewstitched
                 for z = 1:length(AcqData)
 %                     try
-                    Scp.viewAcq('channel',AcqData(z).Channel,'well',Scp.Pos.Well);
+                    Scp.viewAcq('channel',AcqData(z).Channel,'well',Scp.Pos.Well,'channel_index',z);
 %                     catch
 %                     end
                 end
@@ -1466,7 +1479,7 @@ classdef (Abstract) Scope < handle
             arg.acqdata(1).Channel = 'DeepBlue';
             arg.acqdata(1).Exposure = 10; %
             arg.zindex = 1;
-            arg.stitched_pixel_size = Scp.PixelSize*20;
+            arg.stitched_pixel_size = Scp.PixelSize*Scp.preview_binning;
             arg.pixel_size = Scp.PixelSize;
             arg.rotate = 90;
             arg.background = false;
@@ -1478,34 +1491,49 @@ classdef (Abstract) Scope < handle
             arg.verbose=true;
             arg.acq_name = '';
             arg.groups = true;
+            arg.channel_index = 1;
             arg = parseVarargin(varargin,arg);
 
-            if isempty(arg.acq_name)
-                %% Acquire Low Mag
-                %Scp.AutoFocusType = 'none';
-                Scp.acquire(arg.acqdata,'autoshutter', false)
-                %% Load Images and Coordinates
-                listing = dir(Scp.pth);
-                for i=1:length(listing)
-                    if contains(listing(i).name,'acq')
-                        acq_name = listing(i).name;
-                    end
-                end
-            else
-                acq_name = arg.acq_name;
-            end
+%             if isempty(arg.acq_name)
+%                 %% Acquire Low Mag
+%                 %Scp.AutoFocusType = 'none';
+%                 Scp.acquire(arg.acqdata,'autoshutter', false)
+%                 %% Load Images and Coordinates
+%                 listing = dir(Scp.pth);
+%                 for i=1:length(listing)
+%                     if contains(listing(i).name,'acq')
+%                         acq_name = listing(i).name;
+%                     end
+%                 end
+%             else
+%                 acq_name = arg.acq_name;
+%             end
 
             %% Load and Stitch
 %             md = Metadata(Scp.pth);
 %             [Images, idxes] = md.stkread('acq', acq_name, 'flatfieldcorrection', false);
 %             XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
 
-            md = Metadata([Scp.pth,'\',arg.acq_name]);
-            resize = arg.pixel_size/arg.stitched_pixel_size;
-            [Images, idxes] = md.stkread('acq', arg.acq_name, 'flatfieldcorrection', false,'Channel',arg.acqdata(1).Channel,'Zindex',arg.zindex,'resize',resize);
-            XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
+%             md = Metadata([Scp.pth,'\',arg.acq_name]);
+%             resize = arg.pixel_size/arg.stitched_pixel_size;
+%             [Images, idxes] = md.stkread('acq', arg.acq_name, 'flatfieldcorrection', false,'Channel',arg.acqdata(1).Channel,'Zindex',arg.zindex,'resize',resize);
+%             XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
+% 
+%             Posnames_Cell = md.getSpecificMetadataByIndex('Position', idxes);
 
-            Posnames_Cell = md.getSpecificMetadataByIndex('Position', idxes);
+            height = ceil(Scp.Height/Scp.preview_binning);
+            width = ceil(Scp.Width/Scp.preview_binning);
+            Images = zeros([height,width,Scp.Pos.N]);
+            for i=1:Scp.Pos.N
+                if size(Scp.Pos.Other{i},1)==height
+                    stk = Scp.Pos.Other{i};
+                    Images(:,:,i) = stk(:,:,arg.channel_index);
+                end
+            end
+            XY_Cell = Scp.Pos.List;
+            Posnames_Cell = Scp.Pos.Labels;
+
+
             stitched = Scp.stitch(Images,XY_Cell, ...
                 'pixel_size',arg.stitched_pixel_size, ...
                 'stitched_pixel_size',arg.stitched_pixel_size,...
@@ -1531,7 +1559,8 @@ classdef (Abstract) Scope < handle
             updated_posnames = cell(size(Images,3),1);
             x = arg.x;
             y = arg.y;
-            XY_coordinates = round((cell2mat(XY_Cell)-min(cell2mat(XY_Cell)))/arg.stitched_pixel_size)+1;
+%             XY_coordinates = round((cell2mat(XY_Cell)-min(cell2mat(XY_Cell)))/arg.stitched_pixel_size)+1;
+            XY_coordinates = round((XY_Cell-min(XY_Cell))/arg.stitched_pixel_size)+1;
             XY_Limits = max(XY_coordinates)+arg.border;
             for i=1:size(Images,3)
                 img_coordinates = XY_coordinates(i,:);
@@ -1582,12 +1611,17 @@ classdef (Abstract) Scope < handle
             end
             Scp.Pos.Labels = updated_Pos_Labels;
             Scp.Pos.Hidden = hidden;
+            Scp.Pos.keepVisible();
             if arg.verbose
-                figure(12)
+                figure(1)
                 stitched = stitched-prctile(stitched(labelMask>0),5);
                 stitched = stitched/prctile(stitched(labelMask>0),95);
                 imshow(stitched)
             end
+
+            close(10);
+            close(11);
+            close(89);
         end
 
         function stitched = stitch(Scp,Images,XY_Cell,varargin)
@@ -1596,17 +1630,22 @@ classdef (Abstract) Scope < handle
             arg.pixel_size = Scp.PixelSize;
             arg.rotate = 90;
             arg.background = false;
-            arg.sigma = 25;
+            arg.sigma = 500/Scp.preview_binning;
             arg.flip = 0; %dim
             arg.x = 1; %dim
             arg.y = 2; %dim
-            arg.border = 500;
+            arg.border = 3000;
             arg = parseVarargin(varargin,arg);
             x = arg.x;
             y = arg.y;
-            XY_coordinates = round((cell2mat(XY_Cell)-min(cell2mat(XY_Cell)))/arg.stitched_pixel_size)+1;
+            XY_coordinates = round((XY_Cell-min(XY_Cell))/arg.stitched_pixel_size)+1;
+%             try
+%                 XY_coordinates = round((cell2mat(XY_Cell)-min(cell2mat(XY_Cell)))/arg.stitched_pixel_size)+1;
+%             catch
+%                 XY_coordinates = round((XY_Cell-min(XY_Cell))/arg.stitched_pixel_size)+1;
+%             end
             XY_Limits = max(XY_coordinates)+arg.border;
-            stitched = zeros(XY_Limits(x),XY_Limits(y));
+            stitched = zeros(XY_Limits(x)+arg.border,XY_Limits(y)+arg.border);
 %             f = waitbar(0, 'Starting');
 % FF = mean(Images,3);
             for i=1:size(Images,3)
@@ -1676,6 +1715,7 @@ classdef (Abstract) Scope < handle
                         satisfied = true;
                 end
             end
+            delete(h);
         end
 
 
@@ -3010,23 +3050,34 @@ classdef (Abstract) Scope < handle
             arg.acq_name = '';  
             arg.rotate = 90;
             arg.flip = 0;
-            arg.border = 500;
+            arg.border = 3000;
             arg.x = 1;
             arg.y = 2;
             arg.well = '';
             arg.max_figures = 20;
-            arg.stitched_pixel_size = Scp.PixelSize*20;
+            arg.stitched_pixel_size = Scp.PixelSize*Scp.preview_binning;
             arg.zindex = 1;
+            arg.channel_index = 1;
             arg = parseVarargin(varargin,arg);
             if strcmp(arg.acq_name,'')
                 arg.acq_name = Scp.getLastAcqname('pth',arg.path);
             end
 
-            md = Metadata([Scp.pth,'\',arg.acq_name]);
-            resize = arg.pixel_size/arg.stitched_pixel_size;
-            [Images, idxes] = md.stkread('acq', arg.acq_name, 'flatfieldcorrection', false,'Channel',arg.channel,'Zindex',arg.zindex,'resize',resize);
-            XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
-            stitched = Scp.stitch(Images-median(Images,3),XY_Cell, ...
+%             md = Metadata([Scp.pth,'\',arg.acq_name]);
+%             resize = arg.pixel_size/arg.stitched_pixel_size;
+%             [Images, idxes] = md.stkread('acq', arg.acq_name, 'flatfieldcorrection', false,'Channel',arg.channel,'Zindex',arg.zindex,'resize',resize);
+%             XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
+            height = ceil(Scp.Height/Scp.preview_binning);
+            width = ceil(Scp.Width/Scp.preview_binning);
+            Images = zeros([height,width,Scp.Pos.N]);
+            for i=1:Scp.Pos.N
+                if size(Scp.Pos.Other{i},1)==height
+                    stk = Scp.Pos.Other{i};
+                    Images(:,:,i) = stk(:,:,arg.channel_index);
+                end
+            end
+            XY_Cell = Scp.Pos.List;
+            stitched = Scp.stitch(Images-min(Images,[],3),XY_Cell, ...
                 'pixel_size',arg.stitched_pixel_size, ...
                 'rotate',arg.rotate, ...
                 'flip',arg.flip, ...
@@ -3039,10 +3090,10 @@ classdef (Abstract) Scope < handle
             stitched = uint16(stitched*2^16-1);
             filename = [arg.acq_name,'_Well_',arg.well,'_',arg.channel,'.tif'];
             imwrite(stitched,fullfile(Scp.pth,arg.acq_name,filename))
-            vmin = prctile(stitched(stitched>0),5);
-            vmax = prctile(stitched(stitched>0),95);
             stitched = stitched(max(stitched')>0,:);
             stitched = stitched(:,max(stitched)>0);
+            vmin = prctile(stitched(stitched>0),5);
+            vmax = prctile(stitched(stitched>0),99);
             stitched(stitched<vmin) = vmin;
             stitched(stitched>vmax) = vmax;
             Scp.current_figure = Scp.current_figure+1;
