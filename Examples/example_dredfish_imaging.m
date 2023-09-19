@@ -29,7 +29,7 @@ Scp.FlowData.start_Fluidics()
 
 %% Setup Fluidics Parameters
 Scp.FlowData.Rounds = [0];
-Scp.FlowData.FlowGroups = {'A'};
+Scp.FlowData.FlowGroups = {'ABCDEF'};
 Scp.FlowData.Protocols = {'Strip','Hybe'};
 Scp.FlowData.update_FlowData();
 Scp.FlowData.Tasks
@@ -55,13 +55,9 @@ for c=1:Scp.FlowData.n_coverslips
     coverslip = Scp.FlowData.coverslips{c};
     Scp.Pos = Scp.Pos.load([coverslip]);
     Wells = {coverslip};
-%     Scp.createPositions('spacing',0.9, ...
-%         'sitesshape','circle', ...
-%         'sitesperwell',[25,25], ...
-%         'wells',Wells,'optimize',true)
     Scp.Pos.Well = coverslip;
     Scp.filterPositionsByDraw()
-%     Scp.Pos.save
+    Scp.Pos.save
 end
 %% Setup AutoFocus and check Focus
 for c=1:Scp.FlowData.n_coverslips
@@ -88,7 +84,6 @@ for c=1:Scp.FlowData.n_coverslips
     Scp.AF.save
 end
 %% Collect Data
-% Scp.FlowData.Rounds = [25,23,22,4,11,13,12,3,7,21,17,2,10,1,15,19,6,9,14,18,20,24,8,5,16,21];
 Scp.FlowData.Rounds = [26,27,17,7,15,3,22,11,6,10,13,2,4,1,5,23,14,20,9,16,21,24,8,18,19,12,25];
 Scp.FlowData.FlowGroups = {'ABDE'};
 Scp.FlowData.Protocols = {'Strip','Hybe'};
@@ -114,7 +109,7 @@ Scp.AutoFocusType='hardware';
 % % FLOW
 % Scp.FlowData.flow(Scp);
 
-for i=101:size(Scp.FlowData.Tasks,1)
+for i=1:size(Scp.FlowData.Tasks,1)
     Scp.FlowData.current_idx = i;
     % FLOW
     Scp.FlowData.flow(Scp);
