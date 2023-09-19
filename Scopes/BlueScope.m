@@ -3,7 +3,7 @@ classdef BlueScope < Scope
     % zeiss scope.
     
     properties
-        AF = TheseusFocus; 
+        AF = ContrastPlaneFocus; 
         Notifications = Notifications;
         TempHumiditySensor = DHT11('COM14'); %FIX
         FlowData = FluidicsData;
