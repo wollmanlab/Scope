@@ -41,12 +41,37 @@ classdef Positions < handle
             Pos = load(['C:\Users\wollmanlab\Pos_',Well,'.mat']);
             Pos = Pos.Pos;
         end
+
+        function keepVisible(Pos)
+            updated_Pos = Pos;
+            mask = Pos.Hidden==0;
+            if size(Pos.List,1)>1
+                updated_Pos.List = Pos.List(mask,:);
+            end
+            if size(Pos.Labels,1)>1
+                updated_Pos.Labels = Pos.Labels(mask,:);
+            end
+            if size(Pos.Group,1)>1
+                updated_Pos.Group = Pos.Group(mask,:);
+            end
+            if size(Pos.Hidden,1)>1
+                updated_Pos.Hidden = Pos.Hidden(mask,:);
+            end
+            if size(Pos.Other,1)>1
+                updated_Pos.Other = Pos.Other(mask,:);
+            end
+            updated_Pos.current = 0;
+            updated_Pos.optimizeOrder();
+            Pos = updated_Pos;
+        end
+
         
         function remove(Pos,name)
             ix=ismember(Pos.Labels,name); 
             Pos.List(ix,:)=[]; 
             Pos.Labels(ix)=[]; 
             Pos.Group(ix)=[]; 
+            Pos.Other(ix)=[]; 
             Pos.ExperimentMetadata(ix)=[]; 
         end
         
@@ -171,6 +196,8 @@ classdef Positions < handle
             end
             Pos.Labels = [Pos.Labels; labels];
             Pos.Group = [Pos.Group; strtok(labels,'_')];
+            Pos.Hidden = [Pos.Hidden; 0];
+            Pos.Other = [Pos.Other; {}];
         end
         
         function tf = hasZ(Pos)
