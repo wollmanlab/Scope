@@ -7,6 +7,8 @@ classdef ContrastPlaneFocus < NucleiFocus
         method = 'plane';
         n_pos = 3;
         percentage_thresh = 10;
+        group_samples;
+        optimize_speed = true;
 
     end
     methods
@@ -79,15 +81,16 @@ classdef ContrastPlaneFocus < NucleiFocus
                 if AF.Pos.Hidden(i)==0
                     if AF.use_groups
                         g = split(AF.Pos.Labels{i},'-Pos');
-                        g = g{2};
+                        g = g{1};
                     else
                         g = '1';
                     end
-                    AF.Pos.Group{i} = g{2};
+                    AF.Pos.Group{i} = g;
                 end
             end
             AF.groups = unique(AF.Pos.Group(AF.Pos.Hidden==0));
             AF.group_focuses = zeros(length(AF.groups),1);
+            AF.group_samples = zeros(length(AF.groups),AF.n_pos);
         end
 
 
@@ -106,11 +109,13 @@ classdef ContrastPlaneFocus < NucleiFocus
                 if AF.Pos.Hidden(i)==0
                     if AF.use_groups
                         g = split(AF.Pos.Labels{i},'-Pos');
-                        g = g{2};
+                        g = g{1};
                     else
                         g = '1';
                     end
                     AF.Pos.Group{i} = g;
+                else
+                    AF.Pos.Group{i} = '0';
                 end
             end
             AF.groups = unique(AF.Pos.Group(AF.Pos.Hidden==0));
@@ -129,6 +134,7 @@ classdef ContrastPlaneFocus < NucleiFocus
 
                 good_labels = 1:length(AF.Pos.Labels);
                 good_labels = good_labels(m);
+                AF.group_samples(G,:) = datasample(good_labels,AF.n_pos,'Replace',false);
 
                 XYZ = zeros(sum(m),3);
                 XYZ(:,1:2) = AF.Pos.List(m,1:2);
@@ -147,8 +153,12 @@ classdef ContrastPlaneFocus < NucleiFocus
                     Scp.XY = AF.Pos.List(p,1:2);
                     Scp.Z = section_focus; % always start at group focus
                     % Use Medium Speed Scan
-                    position_focus = AF.MiddleOutScan(Scp);
-                    AF.Pos.Group{p} = AF.calcMetric(Scp,'update_scp',true);
+                    if AF.optimize_speed
+                        position_focus = AF.MiddleOutScan(Scp);
+                    else
+                        position_focus = AF.SecondaryImageBasedScan(Scp);
+                    end
+                    AF.Pos.Other{p} = AF.calcMetric(Scp,'update_scp',true);
                     global_XYZ(p,3) = position_focus; 
                     % Maybe snap an image to save and use later %%%%%FUTURE
 %                     toc
@@ -161,6 +171,9 @@ classdef ContrastPlaneFocus < NucleiFocus
             end
             AF.Pos.List = global_XYZ;
             Scp.AutoFocusType=backup_type;
+            for G = 1:length(AF.groups)
+                AF.Pos.Labels{AF.group_samples(G,:)}
+            end
         end
 
         function AF = updateZ(AF,Scp)
@@ -177,13 +190,14 @@ classdef ContrastPlaneFocus < NucleiFocus
                 end
                 good_labels = 1:length(AF.Pos.Labels);
                 good_labels = good_labels(m);
-                if sum(m)>AF.n_pos
-                    n_pos = AF.n_pos;
-                else
-                    n_pos = sum(m);
-                end
-                selected_labels = datasample(good_labels,n_pos,'Replace',false);
-                XYZ = zeros(n_pos,3);
+%                 if sum(m)>AF.n_pos
+%                     n_pos = AF.n_pos;
+%                 else
+%                     n_pos = sum(m);
+%                 end
+%                 selected_labels = datasample(good_labels,n_pos,'Replace',false);
+                selected_labels = AF.group_samples(g,:);
+                XYZ = zeros(AF.n_pos,3);
                 XYZ(:,1:3) = AF.Pos.List(selected_labels,1:3);
                 
 %                 % Go To Center of section
@@ -193,19 +207,26 @@ classdef ContrastPlaneFocus < NucleiFocus
 %                 section_focus = AF.SecondaryImageBasedScan(Scp);
 %                 AF.group_focuses(g) = section_focus;
 
-                for i=1:n_pos
+                for i=1:AF.n_pos
+                    p = selected_labels(i);
                     Scp.XY = XYZ(i,1:2);
                     Scp.Z = XYZ(i,3);
-                    XYZ(i,3) = AF.MiddleOutScan(Scp);
-                    current_metric = AF.calcMetric(Scp);
-                    past_metric = AF.Pos.Group{p};
-                    if (100*abs(past_metric-current_metric)/past_metric)>(AF.percentage_thresh)
-                        disp(['Current Metric is more than ',num2str(AF.percentage_thresh),'% different than previous metric for this position'])
-                        Scp.Z = XYZ(i,3);
-                        XYZ(i,3) = AF.PrimaryImageBasedScan(Scp);
-                        % update last metric
-                        AF.Pos.Group{p} = AF.calcMetric(Scp,'update_scp',true);
+                    if AF.optimize_speed
+                        XYZ(i,3) = AF.MiddleOutScan(Scp);
+                    else
+                        XYZ(i,3) = AF.SecondaryImageBasedScan(Scp);
                     end
+%                     current_metric = AF.calcMetric(Scp,'update_scp',true);
+%                     past_metric = AF.Pos.Other{p};
+%                     if (100*abs(past_metric-current_metric)/past_metric)>(AF.percentage_thresh)
+%                         message = ['Current Metric is more than ',num2str(AF.percentage_thresh),'% different than previous metric for this position'];
+%                         disp(message)
+%                         Scp.Notifications.sendSlackMessage(Scp,message);
+%                         Scp.Z = XYZ(i,3);
+%                         XYZ(i,3) = AF.PrimaryImageBasedScan(Scp);
+%                         % update last metric
+%                         AF.Pos.Other{p} = AF.calcMetric(Scp,'update_scp',true);
+%                     end
                 end
                 translation = median(global_XYZ(selected_labels,3)-XYZ(:,3));
                 global_XYZ(m,3) = global_XYZ(m,3)-translation;
