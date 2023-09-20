@@ -7,6 +7,8 @@ Scp = OrangeScope;
 Scp.Username = 'Zach'; % your username!
 Scp.Project = 'dredFISH'; % the project this dataset correspond to
 Scp.Dataset = ['250T250M47C30F4H.A_1000T250M47C30F4H.B_250T250M47C30F4H.D_1000T250M47C30F4H.E']; % the name of this specific image dataset - i.e. this experiment.
+Scp.Dataset_Path = fullfile(Scp.basePath,Scp.Username,Scp.Project,[Scp.Dataset '_' datestr(floor(Scp.TimeStamp{1,2}),'yyyymmmdd')]);
+% Scp.Dataset_Path = fullfile(Scp.basePath,Scp.Username,Scp.Project,[Scp.Dataset '_' '2023_Sep19']);
 Scp.ExperimentDescription = [''];
 %% Setup Imaging Parameters
 % For Data Collection
