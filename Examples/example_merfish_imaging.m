@@ -8,7 +8,7 @@ Scp.Username = 'Haley'; % your username!
 Scp.Project = 'TBI'; % the project this dataset correspond to
 Scp.Dataset = 'DNA'; % the name of this specific image dataset - i.e. this experiment.
 Scp.Dataset_Path = fullfile(Scp.basePath,Scp.Username,Scp.Project,[Scp.Dataset '_' datestr(floor(Scp.TimeStamp{1,2}),'yyyymmmdd')]);
-% Scp.Dataset_Path = fullfile(Scp.basePath,Scp.Username,Scp.Project,[Scp.Dataset '_' '2023_Sep19']);
+% Scp.Dataset_Path = fullfile(Scp.basePath,Scp.Username,Scp.Project,[Scp.Dataset '_' '2023Sep19']);
 Scp.ExperimentDescription = ['500 ug TBI Probes/brain'];
 
 %% Setup Imaging Parameters
