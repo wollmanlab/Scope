@@ -33,6 +33,7 @@ classdef (Abstract) Scope < handle
         Dataset
         Project
         ExperimentDescription %free form description of the experiment to be saved in the Metadata for this experiment.
+        Dataset_Path = '';
 
         %% Acquisition information
         SkipCounter = 0; % this is for Position skipping
@@ -889,7 +890,11 @@ classdef (Abstract) Scope < handle
                 errordlg('Please define Username, Project and Dataset');
                 error('Please define Username, Project and Dataset');
             end
-            pth = fullfile(Scp.basePath,Scp.Username,Scp.Project,[Scp.Dataset '_' datestr(floor(Scp.TimeStamp{1,2}),'yyyymmmdd')]);
+            if strcmp(Scp.Dataset_Path,'')
+                pth = fullfile(Scp.basePath,Scp.Username,Scp.Project,[Scp.Dataset '_' datestr(floor(Scp.TimeStamp{1,2}),'yyyymmmdd')]);
+            else
+                pth = Scp.Dataset_Path;
+            end
             if ~exist(pth,'dir')
                 mkdir(pth)
             end
