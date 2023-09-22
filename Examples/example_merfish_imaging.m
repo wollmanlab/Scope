@@ -8,7 +8,7 @@ Scp.Username = 'Haley'; % your username!
 Scp.Project = 'TBI'; % the project this dataset correspond to
 Scp.Dataset = 'DNA'; % the name of this specific image dataset - i.e. this experiment.
 Scp.Dataset_Path = fullfile(Scp.basePath,Scp.Username,Scp.Project,[Scp.Dataset '_' datestr(floor(Scp.TimeStamp{1,2}),'yyyymmmdd')]);
-% Scp.Dataset_Path = fullfile(Scp.basePath,Scp.Username,Scp.Project,[Scp.Dataset '_' '2023Sep19']);
+% Scp.Dataset_Path = fullfile(Scp.basePath,Scp.Username,Scp.Project,[Scp.Dataset '_' '2023Sep21']);
 Scp.ExperimentDescription = ['500 ug TBI Probes/brain'];
 
 %% Setup Imaging Parameters
@@ -72,9 +72,9 @@ for c=1:Scp.FlowData.n_coverslips
 %         'sitesperwell',[30,30], ...
 %         'sitesshape','grid', ...
 %         'wells',Wells,'optimize',true)
-    Scp.createPositionFromMM()
+%     Scp.createPositionFromMM()
     Scp.Pos.Well = coverslip;
-    Scp.filterPositionsByDraw('acq_name',position_acq_names{c},'acqdata',preview_acqdata)
+    Scp.filterPositionsByDraw()
     Scp.Pos.save
 end
 %% Setup AutoFocus and check Focus
@@ -166,7 +166,7 @@ Scp.FlowData.AcqData(2).Channel = 'FarRed';
 Scp.FlowData.AcqData(2).Exposure = 2500; %
 Scp.FlowData.AcqData(2).Delay = 10; %
 Scp.AutoFocusType='hardware';
-for i=24:24%:size(Scp.FlowData.Tasks,1)
+for i=3:size(Scp.FlowData.Tasks,1)
     Scp.FlowData.current_idx = i;
     % FLOW
     Scp.FlowData.flow(Scp);
