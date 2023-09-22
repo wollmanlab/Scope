@@ -800,7 +800,7 @@ classdef (Abstract) Scope < handle
             if arg.viewstitched
                 for z = 1:length(AcqData)
 %                     try
-                    Scp.viewAcq('channel',AcqData(z).Channel,'well',Scp.Pos.Well,'channel_index',z);
+                    Scp.viewAcq('channel',AcqData(z).Channel,'well',Scp.Pos.Well,'channel_index',z,'acq_name',acqname);
 %                     catch
 %                     end
                 end
@@ -3064,9 +3064,9 @@ classdef (Abstract) Scope < handle
             arg.zindex = 1;
             arg.channel_index = 1;
             arg = parseVarargin(varargin,arg);
-            if strcmp(arg.acq_name,'')
-                arg.acq_name = Scp.getLastAcqname('pth',arg.path);
-            end
+%             if strcmp(arg.acq_name,'')
+%                 arg.acq_name = Scp.getLastAcqname('pth',arg.path);
+%             end
 
 %             md = Metadata([Scp.pth,'\',arg.acq_name]);
 %             resize = arg.pixel_size/arg.stitched_pixel_size;
