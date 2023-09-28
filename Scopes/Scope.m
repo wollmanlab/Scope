@@ -3115,6 +3115,9 @@ classdef (Abstract) Scope < handle
             colorbar()
             filename = [arg.acq_name,' Well ',arg.well,' ',arg.channel];
             title(filename)
+            filename = [arg.acq_name,'_Well_',arg.well,'_',arg.channel,'.png'];
+            fullFileName = fullfile(Scp.pth,arg.acq_name,filename);
+            saveas(gcf, fullFileName);
         end
 
         function img = microscope_correct_image(Scp,img)
