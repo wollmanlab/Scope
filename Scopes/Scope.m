@@ -3114,7 +3114,7 @@ classdef (Abstract) Scope < handle
             colormap jet
             colorbar()
             filename = [arg.acq_name,' Well ',arg.well,' ',arg.channel];
-            title(filename)
+            title(filename, 'Interpreter', 'none')
             filename = [arg.acq_name,'_Well_',arg.well,'_',arg.channel,'.png'];
             fullFileName = fullfile(Scp.pth,arg.acq_name,filename);
             saveas(gcf, fullFileName);
