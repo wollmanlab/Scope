@@ -4,7 +4,7 @@ classdef ContrastPlaneFocus < NucleiFocus
         groups
         group_focuses
         radius = 1500/2;
-        method = 'plane';
+        method = 'robust_plane';
         n_pos = 3;
         percentage_thresh = 10;
         group_samples;
@@ -24,6 +24,18 @@ classdef ContrastPlaneFocus < NucleiFocus
                 if strcmp(AF.method,'plane')
                     AF.B = [P(:,1), P(:,2), ones(size(P,1),1)] \ P(:,3);
                     Z = [x,y ones(size(1,1),1)]*AF.B;
+                elseif strcmp(AF.method,'robust_plane')
+                    all_P = P;
+                    P_indexes = 1:size(P,1);
+                    Zs = zeros(length(P_indexes),1);
+                    % Robust Plane
+                    for z=1:length(P_indexes)
+                        P = all_P([1:z-1,z+1:end],:);
+                        % Robust Plane
+                        AF.B = [P(:,1), P(:,2), ones(size(P,1),1)] \ P(:,3);
+                        Zs(z) = [x,y ones(size(1,1),1)]*AF.B;
+                    end
+                    Z = median(Zs);
                 elseif  strcmp(AF.method,'median')
                     Z = median(P(:,3));
                 else
@@ -37,7 +49,7 @@ classdef ContrastPlaneFocus < NucleiFocus
 
         function AF = createPostions(AF,Pos,varargin)
             arg.filter = true;
-            arg.percentage = 0.75;
+            arg.percentage = 0.9;
             arg = parseVarargin(varargin,arg);
             AF.Pos = Positions;
             AF.Pos.List = Pos.List(Pos.Hidden==0,1:2);
@@ -50,27 +62,38 @@ classdef ContrastPlaneFocus < NucleiFocus
                 end
                 AF.Pos.Group = cellArray;
             else
-                AF.Pos.Group = Pos.Group(Pos.Hidden==0);
+                cellArray = Pos.Group(Pos.Hidden==0);
+                for i=1:numel(cellArray)
+                    g = split(AF.Pos.Labels{i},'-Pos');
+                    g = g{1};
+                    cellArray{i} = g;
+                end
+                AF.Pos.Group = cellArray;
             end
             AF.Pos.Well = Pos.Well;
-            good_labels = 1:length(AF.Pos.Labels);
-            if arg.filter
-                if floor(length(good_labels)*(1-arg.percentage))>AF.n_neighbors
-                    filtered_labels = datasample(good_labels,floor(length(good_labels)*arg.percentage),'Replace',false);
-                else
-                    if length(good_labels)>AF.n_neighbors
-                        filtered_labels = datasample(good_labels,length(good_labels)-AF.n_neighbors,'Replace',false);
-                    elseif length(good_labels)<3
-                        Scp.Notifications.sendSlackMessage(Scp,['Not Enough Positions for Plane Use NucleiFocus']);
-                        uiwait(msgbox(['You should probably just use NucleiFocus']))
+            groups = unique(AF.Pos.Group);
+            for g = 1:length(groups)
+                group = groups{g};
+                good_labels = 1:length(AF.Pos.Labels);
+                good_labels = good_labels(cellfun(@(x) strcmp(x, group), AF.Pos.Group));
+                if arg.filter
+                    if floor(length(good_labels)*(1-arg.percentage))>AF.n_neighbors
+                        filtered_labels = datasample(good_labels,floor(length(good_labels)*(arg.percentage)),'Replace',false);
                     else
-                        AF.n_neighbors = length(good_labels);
-                        filtered_labels = [];
+                        if length(good_labels)>AF.n_neighbors
+                            filtered_labels = datasample(good_labels,length(good_labels)-AF.n_neighbors,'Replace',false);
+                        elseif length(good_labels)<3
+                            Scp.Notifications.sendSlackMessage(Scp,['Not Enough Positions for Plane Use NucleiFocus']);
+                            uiwait(msgbox(['You should probably just use NucleiFocus']))
+                        else
+                            AF.n_neighbors = length(good_labels);
+                            filtered_labels = [];
+                        end
                     end
+                    %                 AF.Pos.Hidden(:) = 1;
+                    AF.Pos.Hidden(filtered_labels) = 1;
                 end
-                AF.Pos.Hidden(filtered_labels) = 1;
             end
-
         end
 
         function AF = setupPositions(AF,Scp)
