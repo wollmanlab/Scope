@@ -77,6 +77,7 @@ for c=1:Scp.FlowData.n_coverslips
     Scp.filterPositionsByDraw()
     Scp.Pos.save
 end
+
 %% Setup AutoFocus and check Focus
 for c=1:Scp.FlowData.n_coverslips
     coverslip = Scp.FlowData.coverslips{c};
@@ -109,9 +110,23 @@ for c=1:Scp.FlowData.n_coverslips
     Scp.Pos.save
     Scp.AF.save
 end
-%%
-dZ_min = 5;
-dZ_max = 20;
+%% Manually look to where you may want to image
+Scp.AutoFocusType='hardware';
+good_pos = Scp.Pos.Labels(Scp.Pos.Hidden==0);
+Scp.goto(good_pos{1},Scp.Pos);
+Scp.autofocus();
+focus = Scp.Z;
+uiwait(msgbox('Click Okay when at min Z'))
+min_Z = Scp.Z;
+uiwait(msgbox('Click Okay when at max Z'))
+max_Z = Scp.Z;
+dZ_min = min_Z-focus;
+dZ_max = max_Z-focus;
+disp(dZ_min)
+disp(dZ_max)
+%% Use Judgement Call
+dZ_min = 0;
+dZ_max = 15;
 dZ_step = 0.4;
 dZ_steps = linspace(dZ_min,dZ_max,ceil((dZ_max-dZ_min)/dZ_step))
 %% Image PolyT
@@ -135,6 +150,39 @@ for i=2:2
         Scp.AF = Scp.AF.load([coverslip]);
         % Update AutoFocus
         Scp.AF = Scp.AF.updateZ(Scp);
+        pause(15);
+        % Check for photobleaching
+        good_pos = Scp.Pos.Labels(Scp.Pos.Hidden==0);
+        Scp.goto(good_pos{1},Scp.Pos);
+        Scp.autofocus();
+        n_images = 100;
+        Scp.Channel = Scp.FlowData.AcqData(2).Channel;
+        Scp.Exposure = Scp.FlowData.AcqData(2).Exposure;
+        Images = zeros([Scp.Height,Scp.Width,n_images]);
+        for n=1:n_images
+            Images(:,:,n) = Scp.snapImage;
+        end
+        score = zeros(n_images,1);
+        for n=1:n_images
+            img = Images(:,:,n);
+            img = uint16(img*2^16-1);
+            metrics = prctile(img(:),[10,90]);
+            vmin = metrics(1);
+            vmax = metrics(2);
+            score(n) = vmax-vmin;
+        end
+        figure(100)
+        plot([1:n_images],score)
+
+        percent_change = score(end)/score(1);
+        disp(percent_change)
+%         if percent_change<0.3
+%             Scp.Notifications.sendSlackMessage(Scp,'Photobleaching Detected')
+%             uiwait(msgbox('Ready to proceed?'))
+%         end
+        Scp.Notifications.sendSlackMessage(Scp,['Hybe',Scp.FlowData.image_other,' Are you ready to proceed?'])
+        uiwait(msgbox('Ready to proceed?'))
+
         % Image
         Scp.acquire(Scp.FlowData.AcqData, ...
             'baseacqname',['Hybe',Scp.FlowData.image_other], ...
@@ -178,6 +226,39 @@ for i=3:size(Scp.FlowData.Tasks,1)
         Scp.AF = Scp.AF.load([coverslip]);
         % Update AutoFocus
         Scp.AF = Scp.AF.updateZ(Scp);
+
+        % Check for photobleaching
+        good_pos = Scp.Pos.Labels(Scp.Pos.Hidden==0);
+        Scp.goto(good_pos{1},Scp.Pos);
+        Scp.autofocus();
+        n_images = 100;
+        Scp.Channel = Scp.FlowData.AcqData(2).Channel;
+        Scp.Exposure = Scp.FlowData.AcqData(2).Exposure;
+        Images = zeros([Scp.Height,Scp.Width,n_images]);
+        for n=1:n_images
+            Images(:,:,n) = Scp.snapImage;
+        end
+        score = zeros(n_images,1);
+        for n=1:n_images
+            img = Images(:,:,n);
+            img = uint16(img*2^16-1);
+            metrics = prctile(img(:),[10,90]);
+            vmin = metrics(1);
+            vmax = metrics(2);
+            score(n) = vmax-vmin;
+        end
+        figure(100)
+        plot([1:n_images],score)
+
+        percent_change = score(end)/score(1);
+        disp(percent_change)
+%         if percent_change<0.3
+%             Scp.Notifications.sendSlackMessage(Scp,'Photobleaching Detected')
+%             uiwait(msgbox('Ready to proceed?'))
+%         end
+        Scp.Notifications.sendSlackMessage(Scp,['Hybe',Scp.FlowData.image_other,' Are you ready to proceed?'])
+        uiwait(msgbox('Ready to proceed?'))
+
         % Image
         Scp.acquire(Scp.FlowData.AcqData, ...
             'baseacqname',['Hybe',Scp.FlowData.image_other], ...
