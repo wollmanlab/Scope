@@ -24,7 +24,7 @@ classdef Plate < Chamber
     end
     
     methods
-        function P = Plate(type)
+        function P = Plate(type,Scp)
             if nargin==0
                 type = 'Costar96 (3904)';
             end
@@ -36,8 +36,8 @@ classdef Plate < Chamber
                     P.wellDimensions=[32000 32000];
                     P.wellCurvature = [1 1];
                     %P.x0y0 = [ ]; %Has to be determined by Scope stage in ScopeStartup config file
-                    P.x0y0 = [42000 -20000]; %FIX P.x0y0 = [40000 -20000]; %FIX
-                    P.directionXY = [-1 1];
+                    P.x0y0 = [42000+Scp.X_offset -20000+Scp.Y_offset]; %FIX P.x0y0 = [40000 -20000]; %FIX
+                    P.directionXY=Scp.directionXY;
                     P.wellSpacingXY = [40000 40000];
                     P.Wells = { 'A','D','B','E','C','F'};
                case 'FCS2'
