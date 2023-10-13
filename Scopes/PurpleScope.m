@@ -7,12 +7,13 @@ classdef PurpleScope < Scope
         Notifications = Notifications;
         TempHumiditySensor = DHT11('COM7'); %FIX
         FlowData = FluidicsData;
-        X_stage_max_limit = 55000;
-       X_stage_min_limit = -55000;
-       Y_stage_max_limit = 37500;
-       Y_stage_min_limit = -37500;
-       X_offset = 0; % Distance of Scp.X=0 from center of stage
-       Y_offset = 0; % Distance of Scp.Y=0 from center of stage
+        X_stage_max_limit = 50000;
+        X_stage_min_limit = -54000;
+        Y_stage_max_limit = 28000;
+        Y_stage_min_limit = -40000;
+        X_offset = 1000; % Distance of Scp.X=0 from center of stage
+        Y_offset = -5000;%-12000; % Distance of Scp.Y=0 from center of stage
+        directionXY = [-1,1]; % double check
     end
     
     
@@ -52,7 +53,7 @@ classdef PurpleScope < Scope
             
         end
         function PixelSize = getPixelSize(Scp)
-            PixelSize = 0.49;%Scp.mmc.getPixelSizeUm;
+            PixelSize = 0.49/1.5;%Scp.mmc.getPixelSizeUm;
 %             if Scp.Optovar==1
 %                 PixelSize = PixelSize/0.7;
 %             end
@@ -74,7 +75,7 @@ classdef PurpleScope < Scope
         end
         
         function img = microscope_correct_image(Scp,img)
-%             img = flip(img,2);
+            img = flip(img,2);
         end
 
     end
