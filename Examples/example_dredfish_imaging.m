@@ -36,7 +36,7 @@ Scp.FlowData.Protocols = {'Strip','Hybe'};
 Scp.FlowData.update_FlowData();
 Scp.FlowData.Tasks
 %% Acquire All Wells First Find Focus manually First
-Scp.Chamber = Plate('Underwood6');
+Scp.Chamber = Plate('Underwood6',Scp);
 position_acq_names = cell(Scp.FlowData.n_coverslips,1);
 
 Scp.AutoFocusType='none';
