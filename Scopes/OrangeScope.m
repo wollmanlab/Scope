@@ -12,6 +12,7 @@ classdef OrangeScope < Scope
        Y_stage_min_limit = -37500;
        X_offset = 0; % Distance of Scp.X=0 from center of stage
        Y_offset = 0; % Distance of Scp.Y=0 from center of stage
+       directionXY = [-1,1]; % double check
     end
     
     methods
