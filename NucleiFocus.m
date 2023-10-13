@@ -324,15 +324,16 @@ Scp.Exposure = AF.exposure;
             % Open Shutter (Auto Shutter must be off)
             Scp.mmc.setShutterOpen(1);
             pause(0.01);
-            if AF.resize~=1
-                img=imresize(Scp.snapImage, AF.resize);
-            else
-                img = Scp.snapImage;
-            end
+            img = Scp.snapImage;
             Scp.mmc.setAutoShutter(1);
             % Open Shutter (Auto Shutter must be off)
             Scp.mmc.setShutterOpen(0);
             % calculate metric
+
+            if AF.resize~=1
+                img=imresize(img, AF.resize);
+            end
+
             switch lower(AF.metric)
                 case 'sobel'
                     hx = fspecial('sobel');
