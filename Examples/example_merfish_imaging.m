@@ -44,7 +44,7 @@ Scp.FlowData.ImageProtocols = {'ClosedStripHybeImage'};
 Scp.FlowData.update_FlowData();
 Scp.FlowData.Tasks
 %% Acquire All Wells First Find Focus manually First
-Scp.Chamber = Plate('FCS2');
+Scp.Chamber = Plate('FCS2',Scp);
 position_acq_names = cell(Scp.FlowData.n_coverslips,1);
 
 Scp.AutoFocusType='none';
