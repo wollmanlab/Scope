@@ -13,6 +13,7 @@ classdef BlueScope < Scope
         Y_stage_min_limit = 0;
         X_offset = 67000; % Distance of Scp.X=0 from center of stage
         Y_offset = 43000; % Distance of Scp.Y=0 from center of stage
+        directionXY = [-1,1]; % double check
     end
     
     
@@ -54,6 +55,7 @@ classdef BlueScope < Scope
         end
 
         function PixelSize = getPixelSize(Scp)
+%             PixelSize = 0.495;
             PixelSize = 0.08;%Scp.mmc.getPixelSizeUm;
 %             if Scp.Optovar==1
 %                 PixelSize = PixelSize/0.7;
