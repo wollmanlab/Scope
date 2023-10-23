@@ -179,7 +179,8 @@ classdef ContrastPlaneFocus < NucleiFocus
                     if AF.optimize_speed
                         position_focus = AF.MiddleOutScan(Scp);
                     else
-                        position_focus = AF.SecondaryImageBasedScan(Scp);
+%                         position_focus = AF.SecondaryImageBasedScan(Scp);
+                        position_focus = AF.PrimaryImageBasedScan(Scp);
                     end
                     AF.Pos.Other{p} = AF.calcMetric(Scp,'update_scp',true);
                     global_XYZ(p,3) = position_focus; 
