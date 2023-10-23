@@ -351,6 +351,16 @@ Scp.Exposure = AF.exposure;
                     gx=imfilter(img,hx);
                     gy=imfilter(img,hy);
                     metric=mean(hypot(gx(:),gy(:)));
+                case 'sobel_haley'
+                    img = img(1:500,:);
+                    img = imgaussfilt(img,AF.smooth);
+                    bkg = imgaussfilt(img,AF.smooth*10);
+                    img = img-bkg;
+                    hx = fspecial('sobel');
+                    hy = fspecial('sobel')';
+                    gx=imfilter(img,hx);
+                    gy=imfilter(img,hy);
+                    metric=mean(hypot(gx(:),gy(:)));
                 case 'contrast' 
                     if AF.scale>0
                         m=img-imgaussfilt(img,AF.scale);
