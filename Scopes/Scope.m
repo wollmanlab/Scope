@@ -284,7 +284,7 @@ classdef (Abstract) Scope < handle
                 stk=Scp.snapSeq(sum(TriggeredChannels));
             end
 
-
+            pos_index = find(cellfun(@(x) strcmp(x, Scp.Pos.peek), Scp.Pos.Labels));
             % look over all channel
             height = ceil(Scp.Height/Scp.preview_binning);
             width = ceil(Scp.Width/Scp.preview_binning);
@@ -386,7 +386,9 @@ classdef (Abstract) Scope < handle
                     end
                     try
                         img = Scp.microscope_correct_image(img);
-                        stk(:,:,i)=imresize(img,[height,width]);
+                        if size(Scp.Pos.Other{pos_index},1)==0
+                            stk(:,:,i)=imresize(medfilt2(img),[height,width]);
+                        end
                         imwrite(uint16(img*2^16-1),fullfile(Scp.pth,acqname,filename));%AOY added -1
                     catch  %#ok<CTCH>
                         errordlg('Cannot save image to harddeive. Check out space on drive');
@@ -449,8 +451,7 @@ classdef (Abstract) Scope < handle
                 end
                 Scp.TimeStamp='metadata'; % to save within scope timestamps
             end
-            % add imaage to Pos for preview
-            pos_index = find(cellfun(@(x) strcmp(x, Scp.Pos.peek), Scp.Pos.Labels));
+            % add image to Pos for preview
             if size(Scp.Pos.Other{pos_index},1)==0
                 Scp.Pos.Other{pos_index} = stk;
             end
@@ -1659,6 +1660,7 @@ classdef (Abstract) Scope < handle
                 img = Images(:,:,i);
                 if arg.sigma>0
                     img = img -imgaussfilt(img,arg.sigma);
+%                     img = img -medfilt2(img,[ceil(arg.sigma),ceil(arg.sigma)]);
                 end
 %                 %%
 %                 img = img-mean(img(:));
@@ -3078,6 +3080,35 @@ classdef (Abstract) Scope < handle
             for i=1:Scp.Pos.N
                 if size(Scp.Pos.Other{i},1)==height
                     stk = Scp.Pos.Other{i};
+                    Images(:,:,i) = stk(:,:,1);
+                end
+            end
+            XY_Cell = Scp.Pos.List;
+            stitched = Scp.stitch(Images-min(Images,[],3),XY_Cell, ...
+                'pixel_size',arg.stitched_pixel_size, ...
+                'rotate',arg.rotate, ...
+                'flip',arg.flip, ...
+                'border',arg.border, ...
+                'x',arg.x, ...
+                'y',arg.y, ...
+                'stitched_pixel_size',arg.stitched_pixel_size);
+            stitched(stitched<0) = 0;
+            stitched = uint16(stitched*2^16-1);
+            stitched = stitched(max(stitched')>0,:);
+            stitched = stitched(:,max(stitched)>0);
+            vmin = prctile(stitched(stitched>0),25);
+            vmid = prctile(stitched(stitched>0),50);
+            vmax = prctile(stitched(stitched>0),75);
+            std = vmax-vmin;
+            thresh = vmid+4*std;
+            mask = stitched>thresh;
+
+            height = ceil(Scp.Height/Scp.preview_binning);
+            width = ceil(Scp.Width/Scp.preview_binning);
+            Images = zeros([height,width,Scp.Pos.N]);
+            for i=1:Scp.Pos.N
+                if size(Scp.Pos.Other{i},1)==height
+                    stk = Scp.Pos.Other{i};
                     Images(:,:,i) = stk(:,:,arg.channel_index);
                 end
             end
@@ -3097,6 +3128,7 @@ classdef (Abstract) Scope < handle
             imwrite(stitched,fullfile(Scp.pth,arg.acq_name,filename))
             stitched = stitched(max(stitched')>0,:);
             stitched = stitched(:,max(stitched)>0);
+            data_vector = stitched(mask);
             vmin = prctile(stitched(stitched>0),5);
             vmax = prctile(stitched(stitched>0),99);
             stitched(stitched<vmin) = vmin;
@@ -3110,11 +3142,16 @@ classdef (Abstract) Scope < handle
             catch
             end
             figure(Scp.current_figure)
+            set(gcf, 'Position', get(0, 'Screensize'));
+            subplot(3,4,[1 2 3 5 6 7 9 10 11]);
             imshow(stitched,'DisplayRange',[vmin,vmax])
-            colormap jet
+            colormap Jet
             colorbar()
             filename = [arg.acq_name,' Well ',arg.well,' ',arg.channel];
             title(filename, 'Interpreter', 'none')
+            subplot(3,4, [4,8,12]);
+            violin(log10(double(data_vector)+1));
+            title('Log10 Pixels >4 Zscore');
             filename = [arg.acq_name,'_Well_',arg.well,'_',arg.channel,'.png'];
             fullFileName = fullfile(Scp.pth,arg.acq_name,filename);
             saveas(gcf, fullFileName);
