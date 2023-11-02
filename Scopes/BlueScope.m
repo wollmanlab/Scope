@@ -11,8 +11,8 @@ classdef BlueScope < Scope
         X_stage_min_limit = 0;
         Y_stage_max_limit = 75000;
         Y_stage_min_limit = 0;
-        X_offset = 67000; % Distance of Scp.X=0 from center of stage
-        Y_offset = 43000; % Distance of Scp.Y=0 from center of stage
+        X_offset = -16984/2;%67000; % Distance of Scp.X=0 from center of stage
+        Y_offset = 42021/2;%43000; % Distance of Scp.Y=0 from center of stage
         directionXY = [-1,1]; % double check
     end
     
