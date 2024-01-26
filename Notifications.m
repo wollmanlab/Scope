@@ -53,7 +53,12 @@ classdef Notifications
             arg = parseVarargin(varargin,arg);
 
             if (~arg.all)&(A.all)
-                A.sendSlackMessage(Scp,message,'all',true);
+                try
+                    A.sendSlackMessage(Scp,message,'all',true);
+                catch
+                    %
+                end
+
             end
 
             labels = Scp.Pos.Labels(Scp.Pos.Hidden==0);
@@ -81,17 +86,21 @@ classdef Notifications
                     msgbox([message,newline,'Slack Hook not set up correctly'])
                 end
             else
-                status = SendSlackNotification(hook,message,user);
-                if strcmp(status,'ok')==0
-                    message = [message,newline,Scp.Username,newline,' Notification Class Slack Handle not correct'];
-                    try
-                        status = SendSlackNotification(hook,message);
-                    catch
-                        disp('Slack Message Not Sent')
-                    end
+                try
+                    status = SendSlackNotification(hook,message,user);
                     if strcmp(status,'ok')==0
-                        msgbox([message,newline,'Slack Hook not set up correctly'])
+                        message = [message,newline,Scp.Username,newline,' Notification Class Slack Handle not correct'];
+                        try
+                            status = SendSlackNotification(hook,message);
+                        catch
+                            disp('Slack Message Not Sent')
+                        end
+                        if strcmp(status,'ok')==0
+                            msgbox([message,newline,'Slack Hook not set up correctly'])
+                        end
                     end
+                catch
+                    %
                 end
             end
         end
