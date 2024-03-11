@@ -1427,7 +1427,7 @@ classdef (Abstract) Scope < handle
                     h = msgbox(message);
                     set(h,'Position',[350 550 250 100])
                     Image = stitched;
-                    figure(89) % Add instructions here
+                    figure(1000) % Add instructions here
                     imshow(imadjust(Image))
                     title('Draw ROI')
                     totMask = false(size(Image));
@@ -1498,6 +1498,7 @@ classdef (Abstract) Scope < handle
             arg.acq_name = '';
             arg.groups = true;
             arg.channel_index = 1;
+            arg.rename=true;
             arg = parseVarargin(varargin,arg);
 
 %             if isempty(arg.acq_name)
@@ -1549,13 +1550,13 @@ classdef (Abstract) Scope < handle
                 'x',arg.x, ...
                 'y',arg.y);
             if arg.verbose
-                figure(10)
+                figure(1002)
                 imshow(imadjust(stitched))
             end
             %% Draw Masks
             mask = Scp.drawMask(stitched);
             if arg.verbose
-                figure(11)
+                figure(1001)
                 imshow(mask)
             end
             %% Label mask
@@ -1615,7 +1616,9 @@ classdef (Abstract) Scope < handle
                     hidden(i) = 1;
                 end
             end
-            Scp.Pos.Labels = updated_Pos_Labels;
+            if arg.rename
+                Scp.Pos.Labels = updated_Pos_Labels;
+            end
             Scp.Pos.Hidden = hidden;
             Scp.Pos.keepVisible();
             if arg.verbose
@@ -1625,9 +1628,9 @@ classdef (Abstract) Scope < handle
                 imshow(stitched)
             end
 
-            close(10);
-            close(11);
-            close(89);
+            close(1002);
+            close(1001);
+            close(1000);
         end
 
         function stitched = stitch(Scp,Images,XY_Cell,varargin)
@@ -1645,27 +1648,14 @@ classdef (Abstract) Scope < handle
             x = arg.x;
             y = arg.y;
             XY_coordinates = round((XY_Cell-min(XY_Cell))/arg.stitched_pixel_size)+1;
-%             try
-%                 XY_coordinates = round((cell2mat(XY_Cell)-min(cell2mat(XY_Cell)))/arg.stitched_pixel_size)+1;
-%             catch
-%                 XY_coordinates = round((XY_Cell-min(XY_Cell))/arg.stitched_pixel_size)+1;
-%             end
             XY_Limits = max(XY_coordinates)+arg.border;
             stitched = zeros(XY_Limits(x)+arg.border,XY_Limits(y)+arg.border);
-%             f = waitbar(0, 'Starting');
-% FF = mean(Images,3);
             for i=1:size(Images,3)
-%                 waitbar(i/size(Images,3), f, sprintf('Progress: %d %%', floor(i/size(Images,3)*100)));
                 img_coordinates = XY_coordinates(i,:);
                 img = Images(:,:,i);
                 if arg.sigma>0
                     img = img -imgaussfilt(img,arg.sigma);
-%                     img = img -medfilt2(img,[ceil(arg.sigma),ceil(arg.sigma)]);
                 end
-%                 %%
-%                 img = img-mean(img(:));
-%                 img = img/std(img(:));
-                %%
                 % Correct Orientation
                 if arg.rotate~=0
                     img = imrotate(img,arg.rotate);
@@ -1676,7 +1666,6 @@ classdef (Abstract) Scope < handle
                 % Resize Image
                 shape = round(size(img)*arg.pixel_size/arg.stitched_pixel_size)-1;
                 img = imresize(img,shape+1,'bicubic');
-%                 img = imresize(img,shape+1,'nearest');
                 %populatenearest
                 x_lower_bound = img_coordinates(x);
                 x_upper_bound = x_lower_bound+shape(x);
@@ -1701,7 +1690,7 @@ classdef (Abstract) Scope < handle
                 message = ['Instructions:',newline,'Draw a ROI',newline,'Double Click on line',newline,'Repeat for all ROI',newline,'To Exit: Click on empty space',newline,'double click on same empty space to exit'];
                 h = msgbox(message);
                 set(h,'Position',[350 550 250 100])
-                figure(89) % Add instructions here
+                figure(1000) % Add instructions here
                 imshow(imadjust(Image))
                 title('Draw ROI')
                 mask = false(size(Image));
@@ -2536,13 +2525,17 @@ classdef (Abstract) Scope < handle
 %                 fprintf('movment too small - skipping Z movement\n');
 %                 return
 %             end
-            max_attempts = 5;
+
+            max_attempts = 100;
             try
                 for attempt=1:max_attempts
                     if attempt>1
                         pause(attempt)
                         Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
-%                         if attempt>3
+                        if attempt>4
+                            pause(60*attempt)
+                        end
+
 %                             Scp.mmc.setPosition(Scp.mmc.getFocusDevice,Z)
 %                             message = ['Stage is not able to get to this position (Z) Attempt #',int2str(attempt)];
 %                             Scp.Notifications.sendSlackMessage(Scp,message);
@@ -3061,7 +3054,7 @@ classdef (Abstract) Scope < handle
             arg.x = 1;
             arg.y = 2;
             arg.well = '';
-            arg.max_figures = 20;
+            arg.max_figures = 30;
             arg.stitched_pixel_size = Scp.PixelSize*Scp.preview_binning;
             arg.zindex = 1;
             arg.channel_index = 1;
