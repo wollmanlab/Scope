@@ -1,12 +1,12 @@
 %% Initialize Scope
-Scp = PurpleScope;
+Scp = OrangeScope;
 %% Double check that 000 is the top left corner of the scope and Lower Limit
 % Scp.Z = 0;
 % Scp.XY = [0 0];
 %% Set up: username, project name and dataset
 Scp.Username = 'Zach'; % your username!
 Scp.Project = 'thick_dredFISH'; % the project this dataset correspond to
-Scp.Dataset = ['stage_test-100um.B_10um.C_100um.E_10um.F']; % the name of this specific image dataset - i.e. this experiment.
+Scp.Dataset = ['longpolyT-10um.A_100um.B_10um.D_100um.E']; % the name of this specific image dataset - i.e. this experiment.
 Scp.Dataset_Path = fullfile(Scp.basePath,Scp.Username,Scp.Project,[Scp.Dataset '_' datestr(floor(Scp.TimeStamp{1,2}),'yyyymmmdd')]);
 % Scp.Dataset_Path = fullfile(Scp.basePath,Scp.Username,Scp.Project,[Scp.Dataset '_' '2023Sep19']);
 Scp.ExperimentDescription = [''];
@@ -14,16 +14,16 @@ Scp.ExperimentDescription = [''];
 % For Data Collection
 Scp.FlowData.AcqData = AcquisitionData;
 Scp.FlowData.AcqData(1).Channel = 'DeepBlue';
-Scp.FlowData.AcqData(1).Exposure = 100; %
+Scp.FlowData.AcqData(1).Exposure = 50; %
 Scp.FlowData.AcqData(1).Delay = 10; %
-% Scp.FlowData.AcqData(2).Channel = 'FarRed';
-% Scp.FlowData.AcqData(2).Exposure = 2500; %
-% Scp.FlowData.AcqData(2).Delay = 10; %
+Scp.FlowData.AcqData(2).Channel = 'FarRed';
+Scp.FlowData.AcqData(2).Exposure = 1000; %
+Scp.FlowData.AcqData(2).Delay = 10; %
 
 % For Preview
 preview_acqdata = AcquisitionData;
 preview_acqdata(1).Channel = 'DeepBlue';
-preview_acqdata(1).Exposure = 100; %
+preview_acqdata(1).Exposure = 50; %
 preview_acqdata(1).Delay = 10; %
 %%
 Scp.FlowData.start_Gui()
@@ -31,7 +31,7 @@ Scp.FlowData.start_Fluidics()
 
 %% Setup Fluidics Parameters
 Scp.FlowData.Rounds = [0];
-Scp.FlowData.FlowGroups = {'BCEF'};
+Scp.FlowData.FlowGroups = {'BE'};
 Scp.FlowData.Protocols = {'Strip','Hybe'};
 Scp.FlowData.update_FlowData();
 Scp.FlowData.Tasks
@@ -47,6 +47,7 @@ for c=1:Scp.FlowData.n_coverslips
         'sitesshape','circle', ...
         'sitesperwell',[30,30], ...
         'wells',Wells,'optimize',true);
+%     Scp.createPositionFromMM()
     Scp.Pos.Well = coverslip;
 %     Scp.XY = mean(Scp.Pos.List)
     disp(coverslip)
@@ -114,36 +115,36 @@ for c=1:Scp.FlowData.n_coverslips
     dZ_maxs(c) = dZ_max;
 end
 %% Use Judgement Call
-dZ_min = 0;
-dZ_max = 100;
-dZ_step = 1;
-dZ_steps = linspace(dZ_min,dZ_max,ceil((dZ_max-dZ_min)/dZ_step))
+dZ_min = -25;
+dZ_max = 75;
+dZ_step = 4;
+dZ_steps = linspace(dZ_min,dZ_max,ceil((dZ_max-dZ_min)/dZ_step));
 %% Collect Data
-Scp.FlowData.Rounds = [0];
-Scp.FlowData.FlowGroups = {'BCEF'};
+Scp.FlowData.Rounds = [25];
+Scp.FlowData.FlowGroups = {'BE'};
 Scp.FlowData.Protocols = {'Strip','Hybe'};
 Scp.FlowData.update_FlowData();
 Scp.FlowData.Tasks
-% Scp.AutoFocusType='hardware';
-Scp.AutoFocusType='none';
+Scp.AutoFocusType='hardware';
+% Scp.AutoFocusType='none';
 
-for i=2:2%1:size(Scp.FlowData.Tasks,1)
+for i=4:4%1:size(Scp.FlowData.Tasks,1)
     Scp.FlowData.current_idx = i;
     % FLOW
-    Scp.FlowData.flow(Scp);
+%     Scp.FlowData.flow(Scp);
     % IMAGE
     for c = 1:length(Scp.FlowData.image_wells)
         coverslip = Scp.FlowData.image_wells(c);
         Scp.Pos = Scp.Pos.load([coverslip]);
-%         Scp.AF = Scp.AF.load([coverslip]);
+        Scp.AF = Scp.AF.load([coverslip]);
         % Update AutoFocus
-%         Scp.AF = Scp.AF.updateZ(Scp);
+        Scp.AF = Scp.AF.updateZ(Scp);
 %         c_idx = strcmp(coverslip,Scp.FlowData.coverslips);
 %         dZ_steps = linspace(dZ_mins(c_idx),dZ_maxs(c_idx),ceil((dZ_maxs(c_idx)-dZ_mins(c_idx))/dZ_step));
-        Scp.XY = mean(Scp.Pos.List);
-        uiwait(msgbox('Click Okay when at Lowest Z'))
+%         Scp.XY = mean(Scp.Pos.List);
+%         uiwait(msgbox('Click Okay when at Lowest Z'))
         % Image
-        if any(strcmp(coverslip,{'F','C'}))
+        if any(strcmp(coverslip,{'A'}))
             % No Z Steps
             Scp.acquire(Scp.FlowData.AcqData, ...
                 'baseacqname',[Scp.FlowData.image_protocol,Scp.FlowData.image_other])
