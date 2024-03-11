@@ -143,7 +143,11 @@ classdef FluidicsData < handle
                 for protocol = FlowData.Protocols
                     for group = FlowData.FlowGroups
                         ticker = ticker+1;
-                        Steps(ticker,:) = [int2str(hybe),protocol,group];
+                        if isstring(hybe)
+                            Steps(ticker,:) = [hybe,protocol,group];
+                        else
+                            Steps(ticker,:) = [int2str(hybe),protocol,group];
+                        end
                     end
                 end
             end
