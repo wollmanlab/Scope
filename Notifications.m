@@ -14,6 +14,7 @@ classdef Notifications
             slack_users('Haley') = '@hdeocampo';
             slack_users('Roy') = '@rwollman';
             slack_users('Timothy') = '@timothyliu04';
+            slack_users('Aihui') = '@Aihui';
 %             save('notifications_handles.mat', 'slack_users');
 %             
 %             slack_hooks = containers.Map;
@@ -47,20 +48,28 @@ classdef Notifications
                 hook = slack_hooks('NinjaScope');
             end  
         end
+
+        function attemptNotification(A,user,hook,message)
+            try
+                if isempty(user)
+                    status = SendSlackNotification(hook,message);
+                else
+                    status = SendSlackNotification(user,hook,message);
+                end
+                if strcmp(status,'ok')==0
+                    msgbox([message,newline,'Slack Hook not set up correctly'])
+                end
+            catch
+                msgbox([message,newline,'Slack Notification Error'])
+            end
+            
+        end
         
         function sendSlackMessage(A,Scp,message,varargin)
-            arg.all = false;
+            arg.all = true;
             arg = parseVarargin(varargin,arg);
 
-            if (~arg.all)&(A.all)
-                try
-                    A.sendSlackMessage(Scp,message,'all',true);
-                catch
-                    %
-                end
-
-            end
-
+            % Parse Message
             labels = Scp.Pos.Labels(Scp.Pos.Hidden==0);
             if isempty(labels)
                 Well = '';
@@ -72,37 +81,13 @@ classdef Notifications
                 Well = Well{1};
             end
             message = [Scp.Dataset,' ',message,' ',Well];
-
+            
+            % Find User and Hook
             [user,hook] = A.populateSlackAddresses(Scp);
             if arg.all
-                status = SendSlackNotification(hook,message);
-                if strcmp(status,'ok')==0
-                    msgbox([message,newline,'Slack Hook not set up correctly'])
-                end
-            elseif isempty(user)
-                message = [message,newline,Scp.Username];
-                status = SendSlackNotification(hook,message);
-                if strcmp(status,'ok')==0
-                    msgbox([message,newline,'Slack Hook not set up correctly'])
-                end
-            else
-                try
-                    status = SendSlackNotification(hook,message,user);
-                    if strcmp(status,'ok')==0
-                        message = [message,newline,Scp.Username,newline,' Notification Class Slack Handle not correct'];
-                        try
-                            status = SendSlackNotification(hook,message);
-                        catch
-                            disp('Slack Message Not Sent')
-                        end
-                        if strcmp(status,'ok')==0
-                            msgbox([message,newline,'Slack Hook not set up correctly'])
-                        end
-                    end
-                catch
-                    %
-                end
+                user = {};
             end
+            A.attemptNotification(user,hook,message)
         end
     end
 end
