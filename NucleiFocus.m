@@ -285,7 +285,17 @@ Scp.Exposure = AF.exposure;
                 score(zindex) = AF.calcMetric(Scp);
             end
             
-            Zfocus = mean(steps(score==max(score)));
+%             Zfocus = mean(steps(score==max(score)));
+
+%             score_smoothed = medfilt1(score,3);
+            score_smoothed = imgaussfilt(score,3);
+            score_smoothed = score_smoothed-min(score_smoothed);
+            gauss_fit = fit(steps',score_smoothed,'smoothingspline');
+            interpolated_steps = linspace(zmin,zmax,1+round((zmax-zmin)/0.1));
+            interpolated_values = feval(gauss_fit, interpolated_steps);
+            Zfocus = interpolated_steps(interpolated_values == max(interpolated_values));
+%             Zfocus = gauss_fit.b1;
+
             Scp.Z = Zfocus;
             img = Scp.snapImage;
 %             disp(score')
@@ -299,7 +309,14 @@ Scp.Exposure = AF.exposure;
 %             Scp.mmc.stopSequenceAcquisition()
 %             Scp.ContinousImaging = false;
 % figure(707)
-%             scatter(steps,score)
+try
+close(999)
+end
+figure(999)
+hold on
+            scatter(steps,score_smoothed,20,'r')
+            scatter(interpolated_steps,interpolated_values,10,'black')
+            hold off
             Scp.Channel =  previous_channel;
             Scp.Exposure = previous_exposure;
 
