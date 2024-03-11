@@ -7,6 +7,7 @@ classdef ContrastPlaneFocus < NucleiFocus
         method = 'robust_plane';
         n_pos = 3;
         percentage_thresh = 10;
+        min_positions = 20;
         group_samples;
         optimize_speed = true;
 
@@ -49,7 +50,7 @@ classdef ContrastPlaneFocus < NucleiFocus
 
         function AF = createPostions(AF,Pos,varargin)
             arg.filter = true;
-            arg.percentage = 0.9;
+            arg.percentage = 0.95;
             arg = parseVarargin(varargin,arg);
             AF.Pos = Positions;
             AF.Pos.List = Pos.List(Pos.Hidden==0,1:2);
@@ -77,11 +78,11 @@ classdef ContrastPlaneFocus < NucleiFocus
                 good_labels = 1:length(AF.Pos.Labels);
                 good_labels = good_labels(cellfun(@(x) strcmp(x, group), AF.Pos.Group));
                 if arg.filter
-                    if floor(length(good_labels)*(1-arg.percentage))>AF.n_neighbors
+                    if floor(length(good_labels)*(1-arg.percentage))>AF.min_positions
                         filtered_labels = datasample(good_labels,floor(length(good_labels)*(arg.percentage)),'Replace',false);
                     else
-                        if length(good_labels)>AF.n_neighbors
-                            filtered_labels = datasample(good_labels,length(good_labels)-AF.n_neighbors,'Replace',false);
+                        if length(good_labels)>AF.min_positions
+                            filtered_labels = datasample(good_labels,length(good_labels)-AF.min_positions,'Replace',false);
                         elseif length(good_labels)<3
                             Scp.Notifications.sendSlackMessage(Scp,['Not Enough Positions for Plane Use NucleiFocus']);
                             uiwait(msgbox(['You should probably just use NucleiFocus']))
@@ -95,6 +96,59 @@ classdef ContrastPlaneFocus < NucleiFocus
                 end
             end
         end
+
+%         function AF = createPostionsWithCells(AF,Scp,varargin)
+%             arg.filter = true;
+%             arg.percentage = 0.95;
+%             arg = parseVarargin(varargin,arg);
+%             AF.Pos = Positions;
+%             Pos = Scp.Pos;
+%             AF.Pos.List = Pos.List(Pos.Hidden==0,1:2);
+%             AF.Pos.Labels = Pos.Labels(Pos.Hidden==0);
+%             AF.Pos.Hidden = Pos.Hidden(Pos.Hidden==0);
+%             if ~AF.use_groups
+%                 cellArray = Pos.Group(Pos.Hidden==0);
+%                 for i=1:numel(cellArray)
+%                     cellArray{i} = '1';
+%                 end
+%                 AF.Pos.Group = cellArray;
+%             else
+%                 cellArray = Pos.Group(Pos.Hidden==0);
+%                 for i=1:numel(cellArray)
+%                     g = split(AF.Pos.Labels{i},'-Pos');
+%                     g = g{1};
+%                     cellArray{i} = g;
+%                 end
+%                 AF.Pos.Group = cellArray;
+%             end
+%             AF.Pos.Well = Pos.Well;
+%             groups = unique(AF.Pos.Group);
+%             for g = 1:length(groups)
+%                 group = groups{g};
+%                 mask = cellfun(@(x) strcmp(x, group), AF.Pos.Group);
+%                 good_labels = AF.Pos.Labels(mask);
+%                 % Go to center of area to find rough focus
+%                 xy = AF.Pos.List(mask,:);
+%                 [value,index] = min(sum(abs(xy-mean(xy)),2));
+%                 Scp.XY = xy(index,:);
+%                 AF.PrimaryImageBasedScan(Scp);
+%                 keepers = zeros([length(good_labels),1)]);
+%                 for i=1:length(good_labels)
+%                     Scp.Xy = xy(i,;)
+%                     img = Scp.snapImage;
+%                     img = imgaussfilt(img,2);
+%                     bkg = imgsussfilt(img,50);
+%                     img = img-bkg;
+%                     n_pixels = sum(img>arg.thresh);
+%                     if n_pixels>arg_pixel_thresh)
+%                         keepers(i)=1;
+%                     end
+%                 end
+%             end
+
+
+
+%         end
 
         function AF = setupPositions(AF,Scp)
             uiwait(msgbox(['Create Atleast 4 Positions per sample']))
@@ -115,6 +169,9 @@ classdef ContrastPlaneFocus < NucleiFocus
             AF.group_focuses = zeros(length(AF.groups),1);
             AF.group_samples = zeros(length(AF.groups),AF.n_pos);
         end
+
+
+ 
 
 
         function AF = calculateZ(AF,Scp,varargin)
