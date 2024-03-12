@@ -3093,7 +3093,13 @@ classdef (Abstract) Scope < handle
             vmid = prctile(stitched(stitched>0),50);
             vmax = prctile(stitched(stitched>0),75);
             std = vmax-vmin;
-            thresh = vmid+4*std;
+            thresh = vmid;
+            for t=[4,3,2,1,0]
+                temp_thresh = vmid+t*std;
+                if temp_thresh<max(stitched(:))
+                    thresh = temp_thresh;
+                end
+            end
             mask = stitched>thresh;
 
             height = ceil(Scp.Height/Scp.preview_binning);
