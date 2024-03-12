@@ -1129,7 +1129,7 @@ classdef (Abstract) Scope < handle
             arg = parseVarargin(varargin,arg);
 
             if nargin==2 || isempty(Pos) % no position list provided
-                Pos  = Scp.createPositions('tmp',true,'prefix','');
+                Pos  = Scp.createPositions('tmp',true,'prefix','','sitesperwell',[1 1]);
                 single = arg.single;
             else
                 if ~isa(Pos,'Positions')
