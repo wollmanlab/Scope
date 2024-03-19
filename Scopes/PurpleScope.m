@@ -7,10 +7,10 @@ classdef PurpleScope < Scope
         Notifications = Notifications;
         TempHumiditySensor = DHT11('COM7'); %FIX
         FlowData = FluidicsData;
-        X_stage_max_limit = 50000;
+        X_stage_max_limit = 57500;
         X_stage_min_limit = -54000;
-        Y_stage_max_limit = 28000;
-        Y_stage_min_limit = -40000;
+        Y_stage_max_limit = 24000;
+        Y_stage_min_limit = -60000;
         X_offset = 1000; % Distance of Scp.X=0 from center of stage
         Y_offset = -5000;%-12000; % Distance of Scp.Y=0 from center of stage
         directionXY = [-1,1]; % double check
