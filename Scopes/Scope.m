@@ -799,12 +799,14 @@ classdef (Abstract) Scope < handle
             end
 
             if arg.viewstitched
-                for z = 1:length(AcqData)
-%                     try
-                    Scp.viewAcq('channel',AcqData(z).Channel,'well',Scp.Pos.Well,'channel_index',z,'acq_name',acqname);
-%                     catch
-%                     end
-                end
+                Scp.AcqData = AcqData;
+                Scp.viewAcqChannels('well',Scp.Pos.Well,'acq_name',acqname);
+%                 for z = 1:length(AcqData)
+% %                     try
+%                     Scp.viewAcq('channel',AcqData(z).Channel,'well',Scp.Pos.Well,'channel_index',z,'acq_name',acqname);
+% %                     catch
+% %                     end
+%                 end
             end
 
         end
@@ -3044,6 +3046,7 @@ classdef (Abstract) Scope < handle
 
         function viewAcq(Scp,varargin)
             arg.path = Scp.pth;
+            arg.acqdata = '';
             arg.channel = 'DeepBlue';
             arg.acq_name = '';
             arg.pixel_size = Scp.PixelSize;
@@ -3054,7 +3057,7 @@ classdef (Abstract) Scope < handle
             arg.x = 1;
             arg.y = 2;
             arg.well = '';
-            arg.max_figures = 30;
+            arg.max_figures = 12;
             arg.stitched_pixel_size = Scp.PixelSize*Scp.preview_binning;
             arg.zindex = 1;
             arg.channel_index = 1;
@@ -3069,6 +3072,7 @@ classdef (Abstract) Scope < handle
 %             XY_Cell = md.getSpecificMetadataByIndex('XY', idxes);
             height = ceil(Scp.Height/Scp.preview_binning);
             width = ceil(Scp.Width/Scp.preview_binning);
+
             Images = zeros([height,width,Scp.Pos.N]);
             for i=1:Scp.Pos.N
                 if size(Scp.Pos.Other{i},1)==height
@@ -3152,6 +3156,76 @@ classdef (Abstract) Scope < handle
             violin(log10(double(data_vector)+1));
             title('Log10 Pixels >4 Zscore');
             filename = [arg.acq_name,'_Well_',arg.well,'_',arg.channel,'.png'];
+            fullFileName = fullfile(Scp.pth,arg.acq_name,filename);
+            saveas(gcf, fullFileName);
+        end
+
+        function viewAcqChannels(Scp,varargin)
+            arg.path = Scp.pth;
+            arg.acq_name = '';
+            arg.pixel_size = Scp.PixelSize;
+            arg.rotate = 90;
+            arg.flip = 0;
+            arg.border = 3000;
+            arg.x = 1;
+            arg.y = 2;
+            arg.well = '';
+            arg.max_figures = 12;
+            arg.stitched_pixel_size = Scp.PixelSize*Scp.preview_binning;
+            arg.zindex = 1;
+            arg = parseVarargin(varargin,arg);
+
+            channels = {Scp.AcqData.Channel};
+            Scp.current_figure = Scp.current_figure+1;
+            if Scp.current_figure>arg.max_figures
+                Scp.current_figure = 1;
+            end
+            try
+                close(Scp.current_figure)
+            catch
+            end
+
+            figure(Scp.current_figure)
+            set(gcf, 'Position', get(0, 'Screensize'));
+            for channel=1:length(channels)
+                height = ceil(Scp.Height/Scp.preview_binning);
+                width = ceil(Scp.Width/Scp.preview_binning);
+                Images = zeros([height,width,Scp.Pos.N]);
+                for i=1:Scp.Pos.N
+                    if size(Scp.Pos.Other{i},1)==height
+                        stk = Scp.Pos.Other{i};
+                        Images(:,:,i) = stk(:,:,channel);
+                    end
+                end
+                XY_Cell = Scp.Pos.List;
+                stitched = Scp.stitch(Images-min(Images,[],3),XY_Cell, ...
+                    'pixel_size',arg.stitched_pixel_size, ...
+                    'rotate',arg.rotate, ...
+                    'flip',arg.flip, ...
+                    'border',arg.border, ...
+                    'x',arg.x, ...
+                    'y',arg.y, ...
+                    'stitched_pixel_size',arg.stitched_pixel_size);
+                clear Images;
+                stitched(stitched<0) = 0;
+                stitched = uint16(stitched*2^16-1);
+                filename = [arg.acq_name,'_Well_',arg.well,'_',channels{channel},'.tif'];
+                imwrite(stitched,fullfile(Scp.pth,arg.acq_name,filename))
+                stitched = stitched(max(stitched')>0,:);
+                stitched = stitched(:,max(stitched)>0);
+                vmin = prctile(stitched(stitched>0),5);
+                vmax = prctile(stitched(stitched>0),99);
+                stitched(stitched<vmin) = vmin;
+                stitched(stitched>vmax) = vmax;
+
+                subplot(1,length(channels), [channel]);
+                imshow(stitched,'DisplayRange',[vmin,vmax])
+                colormap Jet
+                colorbar()
+                filename = [arg.acq_name,' Well ',arg.well,' ',channels{channel}];
+                title(filename, 'Interpreter', 'none')
+            end
+            filename = [arg.acq_name,'_Well_',arg.well,'.png'];
             fullFileName = fullfile(Scp.pth,arg.acq_name,filename);
             saveas(gcf, fullFileName);
         end
