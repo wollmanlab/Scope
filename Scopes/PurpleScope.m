@@ -53,7 +53,7 @@ classdef PurpleScope < Scope
             
         end
         function PixelSize = getPixelSize(Scp)
-            PixelSize = 0.49/1.5;%Scp.mmc.getPixelSizeUm;
+            PixelSize = (0.49/1.5)/0.8;%Scp.mmc.getPixelSizeUm;
 %             if Scp.Optovar==1
 %                 PixelSize = PixelSize/0.7;
 %             end
