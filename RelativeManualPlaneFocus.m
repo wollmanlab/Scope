@@ -63,6 +63,34 @@ classdef RelativeManualPlaneFocus < NucleiFocus
 %             AF = AF.setRelativeReferencePosition(Scp);
         end
 
+        function AF = updatePlanePoints(AF,Scp,NucleiAF)
+            for G = 1:length(AF.groups)
+                disp(['Group ',int2str(G),' of ',int2str(length(AF.groups))])
+                m1 = ismember(AF.Pos.Group,AF.groups{G});
+                m2 = AF.Pos.Hidden==0;
+                m = m1&m2;
+                if sum(m)==0
+                    continue
+                end
+
+                XYZ = zeros(sum(m),3);
+                XYZ(:,1:2) = AF.Pos.List(m,1:2);
+                % Go To Center of section
+                Scp.XY = mean(XYZ(:,1:2));
+                for i=1:length(AF.locations)
+                    idx = ((G-1)*length(AF.locations))+i;
+                    uiwait(msgbox(['Find Focus ',AF.locations{i}]))
+                    Scp.XY = AF.plane_points(idx,1:2);
+                    Scp.Z = AF.plane_points(idx,3);
+                    NucleiAF = NucleiAF.SecondaryImageBasedScan(Scp);
+                    AF.plane_points(idx,1:2) = Scp.XY;
+                    AF.plane_points(idx,3) = Scp.Z;
+                    AF.plane_points(idx,4) = G;
+
+                end
+            end
+        end
+
         function AF = setRelativeReferencePosition(AF,Scp)
 %             uiwait(msgbox('Set Reference position (XYZ)'))
 %             AF.reference_XY = Scp.XY;
