@@ -20,7 +20,7 @@ classdef (Abstract) Scope < handle
 
         %% imaging properties
         Binning=1;
-        preview_binning = 5;
+        preview_binning = 10;
         Objective
         ObjectiveOffsets
         CameraAngle = 0;
@@ -1621,6 +1621,12 @@ classdef (Abstract) Scope < handle
             if arg.rename
                 Scp.Pos.Labels = updated_Pos_Labels;
             end
+             X = Scp.Pos.List(:,1);
+             Y = Scp.Pos.List(:,2);
+             hidden(X>Scp.X_stage_max_limit) = 1;
+             hidden(X<Scp.X_stage_min_limit) = 1;
+             hidden(Y>Scp.Y_stage_max_limit) = 1;
+             hidden(Y<Scp.Y_stage_min_limit) = 1;
             Scp.Pos.Hidden = hidden;
             Scp.Pos.keepVisible();
             if arg.verbose
@@ -1978,7 +1984,7 @@ classdef (Abstract) Scope < handle
             end
 
             %% Ensure not outside of stage limits
-             hidden = zeros(length(Scp.Pos.Labels),1);
+             hidden = zeros(length(Pos.Labels),1);
              X = Pos.List(:,1);
              Y = Pos.List(:,2);
              hidden(X>Scp.X_stage_max_limit) = 1;
@@ -2711,6 +2717,7 @@ classdef (Abstract) Scope < handle
                 disp(['Current X: ',num2str(currXY(1)),' Desired X: ',num2str(XY(1))])
                 disp(['Current Y: ',num2str(currXY(2)),' Desired Y: ',num2str(XY(2))])
             end
+            
         end
 
         function setXY(Scp,XY)
@@ -2720,16 +2727,24 @@ classdef (Abstract) Scope < handle
 %                 fprintf('movment too small - skipping XY movement\n');
 %                 return
 %             end
-            max_attempts = 5;
+            max_attempts = 100;
             try
                 for attempt=1:max_attempts
-                    if attempt>1
-                        pause(attempt*30)
-                        message = ['Stage is not able to get to this position (XY) Attempt #',int2str(attempt)];
+                    if attempt==1
+                        Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
+                    else
+                        pause(attempt*attempt)
+                        if mod(attempt,2)==0
+                            Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
+                        end
+              
+                        message = ['Stage Warning (XY) Attempt #',int2str(attempt),' X:',num2str(XY(1)),' Y:',num2str(XY(2))];
                         Scp.Notifications.sendSlackMessage(Scp,message);
-                        Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1)-50,XY(2)-50)
+%                         Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1)-50,XY(2)-50)
+               
+                        
                     end
-                    Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
+%                     Scp.mmc.setXYPosition(Scp.mmc.getXYStageDevice,XY(1),XY(2))
                     if Scp.checkXYStage(XY)
                         break
                     end
