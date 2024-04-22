@@ -1,5 +1,6 @@
 classdef RelativeManualPlaneFocus < NucleiFocus
     properties
+        distance=1500;
         window = 25;
         reference_XY;
         reference_Z;
@@ -47,10 +48,24 @@ classdef RelativeManualPlaneFocus < NucleiFocus
                 XYZ = zeros(sum(m),3);
                 XYZ(:,1:2) = AF.Pos.List(m,1:2);
                 % Go To Center of section
+                center = mean(XYZ(:,1:2));
                 Scp.XY = mean(XYZ(:,1:2));
 
                 % Find Focus
                 for i=1:length(AF.locations)
+                    if strcmp(AF.locations{i},'Top')
+                        Scp.XY = center+[AF.distance,0];
+                    elseif strcmp(AF.locations{i},'Bottom')
+                        Scp.XY = center-[AF.distance,0];
+                    elseif strcmp(AF.locations{i},'Right')
+                        Scp.XY = center+[0,AF.distance];
+                    elseif strcmp(AF.locations{i},'Left')
+                        Scp.XY = center-[0,AF.distance];
+                    elseif strcmp(AF.locations{i},'Center')
+                        Scp.XY = center;
+                    end
+
+                       
                     idx = ((G-1)*length(AF.locations))+i;
                     uiwait(msgbox(['Find Focus ',AF.locations{i}]))
                     AF.plane_points(idx,1:2) = Scp.XY;
